@@ -89,64 +89,198 @@ app = Lynk(host=HOST, port=PORT, protocol="TCP", debug=False,
 
 
 # ======================================================================
-# HOME_HTML — the landing page (was missing in v13)
+# HOME_HTML — the landing page
 # ======================================================================
 HOME_HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#070b16">
+<meta name="color-scheme" content="dark">
+<meta name="description" content="Lynkio — multi-tab browser & offensive toolkit">
 <title>Lynk · Home</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-:root{--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
---safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px)}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{min-height:100dvh;background:#070b16;color:#e2e8f0;
-font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
--webkit-font-smoothing:antialiased}
-body{padding:calc(28px + var(--safe-t)) calc(20px + var(--safe-r)) calc(28px + var(--safe-b)) calc(20px + var(--safe-l));
-display:flex;flex-direction:column;align-items:center;gap:26px}
-.wrap{width:100%;max-width:780px}
-.brand{display:flex;align-items:center;gap:12px;margin-bottom:6px}
-.mark{width:42px;height:42px;border-radius:12px;
-background:linear-gradient(135deg,#38bdf8,#818cf8);display:grid;place-items:center;
-color:#0b1220;font-size:18px;font-weight:800}
-h1{font-size:26px;font-weight:800;letter-spacing:-.02em}
-.sub{color:#94a3b8;font-size:14px;margin-top:2px}
-.ver{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11px;
-font-weight:700;background:rgba(56,189,248,.14);color:#38bdf8;
-font-family:'JetBrains Mono',monospace;margin-left:8px;vertical-align:middle}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;width:100%}
-.card{padding:18px;border-radius:14px;background:#0d1526;
-border:1px solid rgba(148,163,184,.14);text-decoration:none;color:inherit;
-transition:.15s;display:flex;flex-direction:column;gap:6px}
-.card:hover{border-color:rgba(56,189,248,.45);transform:translateY(-2px);
-box-shadow:0 20px 40px -20px rgba(56,189,248,.4)}
-.card .ic{font-size:22px}
-.card .nm{font-weight:700;font-size:14px}
-.card .dc{color:#64748b;font-size:12px;line-height:1.5}
-form.search{display:flex;gap:6px;align-items:center;background:#0d1526;
-border:1px solid rgba(148,163,184,.18);border-radius:12px;
-padding:5px 5px 5px 16px;width:100%;flex-wrap:wrap}
-form.search input{flex:1;min-width:180px;background:transparent;border:none;
-outline:none;color:#e2e8f0;font-family:inherit;font-size:15px;padding:12px 0}
-form.search select{background:transparent;border:none;color:#94a3b8;
-font-family:inherit;font-size:13px;padding:8px 6px;cursor:pointer}
-form.search select option{background:#0d1526;color:#e2e8f0}
-form.search button{padding:11px 22px;border-radius:9px;border:none;
-background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;
-font-weight:700;cursor:pointer;font-family:inherit;font-size:13px}
-.kbd{display:inline-block;padding:2px 7px;background:rgba(148,163,184,.12);
-border:1px solid rgba(148,163,184,.2);border-radius:5px;
-font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2e8f0}
-footer{color:#475569;font-size:11.5px;text-align:center;margin-top:auto;
-padding-top:20px;font-family:'JetBrains Mono',monospace}
+:root{
+  --safe-t:env(safe-area-inset-top,0px);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);
+  --safe-r:env(safe-area-inset-right,0px);
+  --bg:#070b16;
+  --bg-2:#0d1526;
+  --bg-3:#131d33;
+  --fg:#e2e8f0;
+  --fg-muted:#94a3b8;
+  --fg-dim:#64748b;
+  --line:rgba(148,163,184,.16);
+  --line-2:rgba(148,163,184,.08);
+  --accent:#38bdf8;
+  --accent-2:#818cf8;
+  --accent-grad:linear-gradient(135deg,#38bdf8,#818cf8);
+  --radius:12px;
+  --radius-lg:16px;
+  --radius-xl:20px;
+  --shadow-accent:0 20px 40px -20px rgba(56,189,248,.5);
+  --t:.18s cubic-bezier(.4,0,.2,1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+html,body{min-height:100dvh}
+body{
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%,rgba(56,189,248,.09),transparent 70%),
+    radial-gradient(ellipse 60% 40% at 85% 100%,rgba(129,140,248,.07),transparent 70%),
+    var(--bg);
+  color:var(--fg);
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-size:15px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+  padding:calc(clamp(20px,4vw,32px) + var(--safe-t))
+          calc(clamp(14px,3vw,20px) + var(--safe-r))
+          calc(clamp(20px,4vw,32px) + var(--safe-b))
+          calc(clamp(14px,3vw,20px) + var(--safe-l));
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:clamp(16px,2.6vw,26px);
+}
+.wrap{width:100%;max-width:820px}
+.brand{display:flex;align-items:center;gap:14px;margin-bottom:4px}
+.mark{
+  width:clamp(40px,9vw,48px);height:clamp(40px,9vw,48px);
+  border-radius:14px;background:var(--accent-grad);
+  display:grid;place-items:center;color:#0b1220;
+  font-size:clamp(18px,4vw,20px);font-weight:800;
+  flex-shrink:0;
+  box-shadow:0 12px 24px -10px rgba(56,189,248,.55);
+}
+.brand-text{min-width:0}
+h1{
+  font-size:clamp(20px,4.6vw,26px);
+  font-weight:800;letter-spacing:-.02em;
+  line-height:1.15;
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px;
+}
+.ver{
+  display:inline-block;padding:3px 9px;border-radius:6px;
+  font-size:11px;font-weight:700;
+  background:rgba(56,189,248,.14);color:#38bdf8;
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  letter-spacing:.02em;vertical-align:middle;
+}
+.sub{color:var(--fg-muted);font-size:clamp(12px,2.6vw,14px);margin-top:3px}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));
+  gap:clamp(10px,2vw,14px);width:100%;
+}
+.card{
+  padding:clamp(14px,3vw,18px);
+  border-radius:var(--radius-lg);
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  text-decoration:none;color:inherit;
+  transition:transform var(--t),border-color var(--t),background var(--t),box-shadow var(--t);
+  display:flex;flex-direction:column;gap:6px;
+  min-height:clamp(110px,22vw,140px);
+  position:relative;overflow:hidden;
+}
+.card::after{
+  content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(135deg,rgba(56,189,248,.06),transparent 60%);
+  opacity:0;transition:opacity var(--t);
+}
+@media(hover:hover){
+  .card:hover{
+    border-color:rgba(56,189,248,.45);
+    transform:translateY(-2px);
+    box-shadow:var(--shadow-accent);
+  }
+  .card:hover::after{opacity:1}
+}
+.card:active{transform:scale(.985)}
+.card .ic{font-size:clamp(20px,4.5vw,24px);line-height:1}
+.card .nm{font-weight:700;font-size:clamp(13.5px,3vw,14.5px);letter-spacing:-.01em}
+.card .dc{color:var(--fg-dim);font-size:clamp(11.5px,2.6vw,12.5px);line-height:1.5}
+
+form.search{
+  display:flex;gap:6px;align-items:center;
+  background:var(--bg-2);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  padding:5px 5px 5px 16px;
+  width:100%;
+  transition:border-color var(--t),box-shadow var(--t);
+  flex-wrap:wrap;
+}
+form.search:focus-within{
+  border-color:rgba(56,189,248,.55);
+  box-shadow:0 0 0 4px rgba(56,189,248,.12);
+}
+form.search input{
+  flex:1 1 180px;min-width:0;
+  background:transparent;border:none;outline:none;
+  color:var(--fg);font-family:inherit;
+  font-size:clamp(14px,3.2vw,15px);
+  padding:12px 0;
+}
+form.search input::placeholder{color:var(--fg-dim)}
+form.search select{
+  background:transparent;border:none;color:var(--fg-muted);
+  font-family:inherit;font-size:13px;padding:8px 6px;cursor:pointer;
+  max-width:130px;
+}
+form.search select option{background:var(--bg-2);color:var(--fg)}
+form.search button{
+  padding:11px 22px;border-radius:10px;border:none;
+  background:var(--accent-grad);color:#0b1220;
+  font-weight:700;cursor:pointer;font-family:inherit;
+  font-size:13px;letter-spacing:.01em;
+  transition:filter var(--t),transform var(--t);
+  min-height:42px;flex-shrink:0;
+}
+form.search button:hover{filter:brightness(1.08)}
+form.search button:active{transform:scale(.97)}
+@media(max-width:520px){
+  form.search{padding:5px 5px 5px 14px;gap:4px}
+  form.search button{padding:10px 18px;font-size:12.5px}
+  form.search select{max-width:100px;font-size:12px}
+}
+
+.kbd{
+  display:inline-flex;align-items:center;justify-content:center;
+  padding:2px 7px;min-width:22px;height:22px;
+  background:rgba(148,163,184,.12);
+  border:1px solid rgba(148,163,184,.2);
+  border-radius:5px;
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  font-size:11px;color:var(--fg);line-height:1;
+}
+.hints{
+  color:var(--fg-muted);font-size:clamp(11.5px,2.6vw,13px);
+  line-height:1.8;text-align:center;
+  padding:0 4px;
+}
+.hints .sep{opacity:.4;margin:0 6px}
+footer{
+  color:#475569;font-size:11.5px;text-align:center;
+  margin-top:auto;padding-top:24px;
+  font-family:'JetBrains Mono',ui-monospace,monospace;
+  letter-spacing:.02em;
+}
+@media(max-width:420px){
+  .hints .sep{display:none}
+  .hints span.hint-item{display:block;padding:2px 0}
+}
 </style></head><body>
+
 <div class="wrap">
   <div class="brand">
     <div class="mark">L</div>
-    <div>
+    <div class="brand-text">
       <h1>Lynkio <span class="ver">v__VERSION__</span></h1>
       <div class="sub">Multi-tab browser · offensive toolkit · proxy shell</div>
     </div>
@@ -154,9 +288,9 @@ padding-top:20px;font-family:'JetBrains Mono',monospace}
 </div>
 
 <div class="wrap">
-  <form class="search" action="/search" method="get">
-    <input name="q" placeholder="Search the web…" autocomplete="off" required>
-    <select name="engine">__OPTS__</select>
+  <form class="search" action="/search" method="get" role="search">
+    <input name="q" placeholder="Search the web…" autocomplete="off" autocapitalize="off" spellcheck="false" required aria-label="Search query">
+    <select name="engine" aria-label="Search engine">__OPTS__</select>
     <button type="submit">Search</button>
   </form>
 </div>
@@ -184,10 +318,12 @@ padding-top:20px;font-family:'JetBrains Mono',monospace}
   </a>
 </div>
 
-<div class="wrap" style="color:#94a3b8;font-size:13px;line-height:1.7;text-align:center">
-  Press <span class="kbd">Ctrl</span>+<span class="kbd">K</span> to search ·
-  <span class="kbd">Ctrl</span>+<span class="kbd">F</span> scraper ·
-  <span class="kbd">Ctrl</span>+<span class="kbd">B</span> toolkit
+<div class="wrap hints">
+  <span class="hint-item">Press <span class="kbd">Ctrl</span>+<span class="kbd">K</span> to search</span>
+  <span class="sep">·</span>
+  <span class="hint-item"><span class="kbd">Ctrl</span>+<span class="kbd">F</span> scraper</span>
+  <span class="sep">·</span>
+  <span class="hint-item"><span class="kbd">Ctrl</span>+<span class="kbd">B</span> toolkit</span>
 </div>
 
 <footer>lynkio v__VERSION__ · bind 0.0.0.0:8080</footer>
@@ -201,6 +337,8 @@ padding-top:20px;font-family:'JetBrains Mono',monospace}
 TABS_HTML = r"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=yes">
+<meta name="theme-color" content="#070b16">
+<meta name="color-scheme" content="dark">
 <title>Lynk · Multi-tab Browser</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -213,22 +351,37 @@ TABS_HTML = r"""<!DOCTYPE html>
   --safe-r: env(safe-area-inset-right, 0px);
   --bg:#070b16;
   --bg-2:#0d1526;
+  --bg-3:#131d33;
+  --fg:#e2e8f0;
+  --fg-muted:#94a3b8;
+  --fg-dim:#64748b;
   --line:rgba(148,163,184,.16);
+  --line-2:rgba(148,163,184,.08);
+  --accent:#38bdf8;
+  --accent-2:#818cf8;
+  --accent-grad:linear-gradient(135deg,#38bdf8,#818cf8);
+  --danger:#f87171;
+  --radius:10px;
+  --radius-lg:14px;
+  --radius-xl:18px;
+  --t:.18s cubic-bezier(.4,0,.2,1);
+  --t-bounce:.26s cubic-bezier(.34,1.36,.64,1);
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
 html,body{
   height:100%;
-  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
-  background:var(--bg);color:#e2e8f0;overflow:hidden;
-  -webkit-font-smoothing:antialiased;overscroll-behavior:none;
+  font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--fg);overflow:hidden;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+  overscroll-behavior:none;touch-action:manipulation;
 }
 body{
   display:flex;flex-direction:column;
-  height:100vh;
-  height:100dvh;
-  min-height:0;
+  height:100vh;height:100dvh;min-height:0;
 }
 
+/* ---------------- header ---------------- */
 header{
   display:flex;align-items:center;gap:8px;
   padding:8px 10px;
@@ -242,50 +395,53 @@ header{
 .brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px;
 flex-shrink:0;margin-right:4px}
 .brand-mark{width:26px;height:26px;border-radius:8px;
-background:linear-gradient(135deg,#38bdf8,#818cf8);display:grid;place-items:center;
-color:#0b1220;font-size:12px;font-weight:800}
+background:var(--accent-grad);display:grid;place-items:center;
+color:#0b1220;font-size:12px;font-weight:800;flex-shrink:0}
 
 .tabs{display:flex;gap:4px;flex:1;overflow-x:auto;scrollbar-width:none;
 padding:2px 0;align-items:center;min-height:36px;-webkit-overflow-scrolling:touch}
 .tabs::-webkit-scrollbar{display:none}
 .tab{display:flex;align-items:center;gap:6px;padding:0 4px 0 10px;height:32px;
-border-radius:9px;background:transparent;color:#94a3b8;cursor:pointer;
+border-radius:9px;background:transparent;color:var(--fg-muted);cursor:pointer;
 font-size:12.5px;font-weight:600;white-space:nowrap;border:1px solid transparent;
-max-width:220px;min-width:90px;transition:.12s;position:relative;user-select:none}
-.tab:hover{background:rgba(148,163,184,.08);color:#e2e8f0}
-.tab.active{background:rgba(56,189,248,.12);color:#38bdf8;border-color:rgba(56,189,248,.3)}
+max-width:220px;min-width:90px;transition:background var(--t),color var(--t),border-color var(--t);
+position:relative;user-select:none;flex-shrink:0}
+.tab:hover{background:rgba(148,163,184,.08);color:var(--fg)}
+.tab.active{background:rgba(56,189,248,.12);color:var(--accent);border-color:rgba(56,189,248,.3)}
 .tab .tab-title{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1}
 .tab .close{display:flex;align-items:center;justify-content:center;
-width:24px;height:24px;flex-shrink:0;border-radius:6px;color:#64748b;
-font-size:16px;line-height:1;cursor:pointer;transition:.12s;position:relative}
-.tab .close:hover{background:rgba(248,113,113,.18);color:#f87171}
+width:24px;height:24px;flex-shrink:0;border-radius:6px;color:var(--fg-dim);
+font-size:16px;line-height:1;cursor:pointer;transition:background var(--t),color var(--t);
+position:relative}
+.tab .close:hover{background:rgba(248,113,113,.18);color:var(--danger)}
 .tab.active .close:hover{background:rgba(248,113,113,.22);color:#fca5a5}
 .tab.has-scrape-hits::after{content:'';position:absolute;top:4px;right:4px;
 width:6px;height:6px;border-radius:50%;background:#f59e0b}
 
 .newtab-inline{display:flex;align-items:center;justify-content:center;
 width:34px;height:34px;flex-shrink:0;border-radius:9px;
-border:1px solid rgba(148,163,184,.2);background:transparent;color:#94a3b8;
-font-size:18px;line-height:1;cursor:pointer;transition:.12s}
+border:1px solid rgba(148,163,184,.2);background:transparent;color:var(--fg-muted);
+font-size:18px;line-height:1;cursor:pointer;transition:all var(--t);padding:0}
 .newtab-inline:hover{background:rgba(56,189,248,.1);border-color:rgba(56,189,248,.4);
-color:#38bdf8}
+color:var(--accent)}
 
 .btn{padding:7px 13px;border-radius:9px;border:1px solid rgba(148,163,184,.2);
-background:transparent;color:#e2e8f0;font-family:inherit;font-size:12.5px;
-font-weight:600;cursor:pointer;transition:.12s;white-space:nowrap;
+background:transparent;color:var(--fg);font-family:inherit;font-size:12.5px;
+font-weight:600;cursor:pointer;transition:all var(--t);white-space:nowrap;
 display:inline-flex;align-items:center;gap:6px;min-height:34px}
 .btn:hover{background:rgba(148,163,184,.08);border-color:rgba(148,163,184,.35)}
-.btn.primary{background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;border:none;
+.btn.primary{background:var(--accent-grad);color:#0b1220;border:none;
 box-shadow:0 8px 18px -8px rgba(56,189,248,.5)}
 .btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .btn.icon{padding:7px 10px}
-.btn.danger{border-color:rgba(248,113,113,.35);color:#f87171}
+.btn.danger{border-color:rgba(248,113,113,.35);color:var(--danger)}
 .btn.danger:hover{background:rgba(248,113,113,.1)}
 .btn.small{padding:5px 10px;font-size:11.5px;min-height:28px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btn:active{transform:translateY(1px)}
 .btn.primary:active{transform:translateY(0)}
 
+/* ---------------- url bar ---------------- */
 .url-bar{
   display:flex;align-items:center;gap:6px;
   padding:8px 10px;
@@ -296,43 +452,43 @@ box-shadow:0 8px 18px -8px rgba(56,189,248,.5)}
   flex-shrink:0;position:relative;z-index:19;
 }
 .nav-btn{padding:8px 11px;border-radius:8px;border:1px solid rgba(148,163,184,.2);
-background:transparent;color:#e2e8f0;cursor:pointer;font-size:14px;line-height:1;
-transition:.12s;min-width:36px;min-height:36px;display:grid;place-items:center}
+background:transparent;color:var(--fg);cursor:pointer;font-size:14px;line-height:1;
+transition:background var(--t),opacity var(--t);
+min-width:36px;min-height:36px;display:grid;place-items:center;flex-shrink:0}
 .nav-btn:hover:not(:disabled){background:rgba(148,163,184,.08)}
 .nav-btn:disabled{opacity:.35;cursor:not-allowed}
-.url-bar input{flex:1;min-width:0;padding:10px 14px;background:var(--bg);color:#e2e8f0;
+.url-bar input{flex:1;min-width:0;padding:10px 14px;background:var(--bg);color:var(--fg);
 border:1px solid rgba(148,163,184,.2);border-radius:10px;
 font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12.5px;outline:none;
-transition:.15s}
+transition:border-color var(--t),box-shadow var(--t)}
 .url-bar input:focus{border-color:rgba(56,189,248,.55);
 box-shadow:0 0 0 3px rgba(56,189,248,.12)}
 
+/* ---------------- stack / frames ---------------- */
 .stack{
-  flex:1 1 auto;
-  min-height:0;
-  position:relative;
-  background:#000;
-  overflow:hidden;
+  flex:1 1 auto;min-height:0;position:relative;
+  background:#000;overflow:hidden;
 }
 .frame{position:absolute;inset:0;width:100%;height:100%;border:none;display:none;background:#fff}
 .frame.active{display:block}
 .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-flex-direction:column;gap:16px;background:var(--bg);color:#94a3b8;font-size:14px;
+flex-direction:column;gap:16px;background:var(--bg);color:var(--fg-muted);font-size:14px;
 text-align:center;padding:24px;z-index:5}
-.overlay-icon{font-size:56px;opacity:.5}
-.overlay-title{font-size:16px;font-weight:600;color:#e2e8f0}
-.overlay-hint{font-size:13px;max-width:460px;line-height:1.7}
+.overlay-icon{font-size:clamp(42px,10vw,56px);opacity:.5}
+.overlay-title{font-size:clamp(15px,3.4vw,16px);font-weight:600;color:var(--fg)}
+.overlay-hint{font-size:clamp(12px,2.8vw,13px);max-width:460px;line-height:1.8}
 kbd{display:inline-block;padding:2px 8px;background:rgba(148,163,184,.12);
 border:1px solid rgba(148,163,184,.2);border-radius:5px;
-font-family:'JetBrains Mono',monospace;font-size:11px;color:#e2e8f0;line-height:1.3}
+font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--fg);line-height:1.3}
 
+/* ---------------- drawers ---------------- */
 .drawer{
   position:fixed;background:var(--bg-2);
   border-left:1px solid var(--line);
   top:0;bottom:0;width:min(560px,100vw);z-index:9997;
   display:flex;flex-direction:column;
   box-shadow:-24px 0 60px -20px rgba(0,0,0,.75);
-  transition:transform .26s cubic-bezier(.34,1.36,.64,1);
+  transition:transform var(--t-bounce);
   padding-top:var(--safe-t);
   padding-bottom:var(--safe-b);
 }
@@ -350,159 +506,168 @@ transform:translateX(-100%);box-shadow:24px 0 60px -20px rgba(0,0,0,.75)}
   padding-right:calc(18px + var(--safe-r));
   background:linear-gradient(180deg,rgba(56,189,248,.06),transparent);
 }
-.drawer-title{font-weight:800;font-size:15px;display:flex;align-items:center;gap:10px}
+.drawer-title{font-weight:800;font-size:15px;display:flex;align-items:center;gap:10px;min-width:0}
 .drawer-title .mark{width:26px;height:26px;border-radius:8px;
-background:linear-gradient(135deg,#38bdf8,#818cf8);display:grid;place-items:center;
-color:#0b1220;font-size:13px;font-weight:800}
+background:var(--accent-grad);display:grid;place-items:center;
+color:#0b1220;font-size:13px;font-weight:800;flex-shrink:0}
+.drawer-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .drawer-body{flex:1;overflow-y:auto;padding:16px 18px;font-size:13px;
--webkit-overflow-scrolling:touch}
-.drawer-close{background:rgba(148,163,184,.08);border:none;color:#94a3b8;
+-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.drawer-close{background:rgba(148,163,184,.08);border:none;color:var(--fg-muted);
 width:34px;height:34px;border-radius:9px;font-size:16px;cursor:pointer;
-display:grid;place-items:center;transition:.12s}
-.drawer-close:hover{background:rgba(248,113,113,.15);color:#f87171}
+display:grid;place-items:center;transition:all var(--t);flex-shrink:0;padding:0}
+.drawer-close:hover{background:rgba(248,113,113,.15);color:var(--danger)}
 
+/* ---------------- scraper ---------------- */
 .scraper-search{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
-.scraper-search input{flex:1;min-width:0;padding:11px 14px;background:var(--bg);
-color:#e2e8f0;border:1px solid rgba(148,163,184,.2);border-radius:10px;
-font-family:inherit;font-size:14px;outline:none;transition:.15s}
+.scraper-search input{flex:1 1 180px;min-width:0;padding:11px 14px;background:var(--bg);
+color:var(--fg);border:1px solid rgba(148,163,184,.2);border-radius:10px;
+font-family:inherit;font-size:14px;outline:none;
+transition:border-color var(--t),box-shadow var(--t)}
 .scraper-search input:focus{border-color:rgba(56,189,248,.5);
 box-shadow:0 0 0 3px rgba(56,189,248,.1)}
 .scraper-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .scraper-filter{padding:6px 12px;border-radius:20px;
-background:rgba(148,163,184,.08);color:#94a3b8;
+background:rgba(148,163,184,.08);color:var(--fg-muted);
 border:1px solid rgba(148,163,184,.15);cursor:pointer;user-select:none;
-font-weight:600;font-size:11.5px;transition:.12s}
-.scraper-filter.active{background:rgba(56,189,248,.15);color:#38bdf8;
+font-weight:600;font-size:11.5px;transition:all var(--t)}
+.scraper-filter.active{background:rgba(56,189,248,.15);color:var(--accent);
 border-color:rgba(56,189,248,.4)}
 .scraper-match{padding:12px;background:var(--bg);border-radius:10px;
-margin-bottom:6px;border-left:3px solid #38bdf8}
+margin-bottom:6px;border-left:3px solid var(--accent)}
 .scraper-match .meta{display:flex;gap:8px;align-items:center;margin-bottom:6px;
-font-size:11px;color:#64748b;font-family:'JetBrains Mono',monospace;flex-wrap:wrap}
-.scraper-match .meta .tab-badge{background:rgba(56,189,248,.15);color:#38bdf8;
+font-size:11px;color:var(--fg-dim);font-family:'JetBrains Mono',ui-monospace,monospace;
+flex-wrap:wrap}
+.scraper-match .meta .tab-badge{background:rgba(56,189,248,.15);color:var(--accent);
 padding:2px 8px;border-radius:5px;font-weight:600;max-width:180px;
 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.scraper-match .ctx{font-family:'JetBrains Mono',monospace;font-size:12px;
-line-height:1.55;color:#e2e8f0;word-break:break-word;
+.scraper-match .ctx{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;
+line-height:1.55;color:var(--fg);word-break:break-word;
 padding:8px 10px;background:rgba(2,6,23,.5);border-radius:7px;margin-bottom:6px}
-.scraper-match .ctx mark{background:rgba(56,189,248,.25);color:#38bdf8;
+.scraper-match .ctx mark{background:rgba(56,189,248,.25);color:var(--accent);
 padding:1px 3px;border-radius:3px;font-weight:700}
 .scraper-match .ctx mark[contenteditable="true"]{background:rgba(245,158,11,.18);
 color:#f59e0b;outline:2px solid #f59e0b}
 .scraper-match .actions{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .scraper-match .actions button{padding:5px 10px;font-size:11px;border-radius:6px;
-border:1px solid rgba(148,163,184,.25);background:transparent;color:#e2e8f0;
-cursor:pointer;font-family:inherit;font-weight:600;transition:.12s;min-height:28px}
+border:1px solid rgba(148,163,184,.25);background:transparent;color:var(--fg);
+cursor:pointer;font-family:inherit;font-weight:600;transition:all var(--t);min-height:28px}
 
+/* ---------------- kit ---------------- */
 .kit-tabs{display:flex;gap:4px;margin-bottom:14px;
 background:rgba(2,6,23,.6);padding:4px;border-radius:11px;
-border:1px solid rgba(148,163,184,.1);overflow-x:auto;scrollbar-width:none}
+border:1px solid rgba(148,163,184,.1);overflow-x:auto;scrollbar-width:none;
+-webkit-overflow-scrolling:touch}
 .kit-tabs::-webkit-scrollbar{display:none}
 .kit-tab{padding:8px 14px;border-radius:8px;background:transparent;
-border:none;color:#94a3b8;font-family:inherit;font-size:12.5px;font-weight:600;
-cursor:pointer;white-space:nowrap;transition:.12s;min-height:36px}
-.kit-tab.active{background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220}
-.kit-tab:not(.active):hover{background:rgba(148,163,184,.08);color:#e2e8f0}
+border:none;color:var(--fg-muted);font-family:inherit;font-size:12.5px;font-weight:600;
+cursor:pointer;white-space:nowrap;transition:background var(--t),color var(--t);
+min-height:36px;flex-shrink:0}
+.kit-tab.active{background:var(--accent-grad);color:#0b1220}
+.kit-tab:not(.active):hover{background:rgba(148,163,184,.08);color:var(--fg)}
 .kit-tab .count{opacity:.7;font-weight:700;margin-left:2px}
 
 .kit-cat{margin-bottom:20px}
 .kit-cat-title{font-size:10.5px;font-weight:800;letter-spacing:.14em;
-text-transform:uppercase;color:#64748b;margin-bottom:10px;
+text-transform:uppercase;color:var(--fg-dim);margin-bottom:10px;
 padding-bottom:6px;border-bottom:1px solid rgba(148,163,184,.1);
 display:flex;align-items:center;gap:8px}
 .kit-cat-title .count{color:#475569;font-weight:600;letter-spacing:0;text-transform:none}
 
-.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+.kit-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:8px}
 .kit-tile{padding:12px;border-radius:11px;background:var(--bg);
-border:1px solid rgba(148,163,184,.1);cursor:pointer;transition:.15s;
-display:flex;flex-direction:column;gap:6px;position:relative;overflow:hidden;
-text-align:left;font-family:inherit;color:inherit;min-height:110px}
+border:1px solid rgba(148,163,184,.1);cursor:pointer;
+transition:all var(--t);display:flex;flex-direction:column;gap:6px;
+position:relative;overflow:hidden;text-align:left;font-family:inherit;
+color:inherit;min-height:110px;-webkit-appearance:none;appearance:none}
 .kit-tile:hover{border-color:rgba(56,189,248,.4);background:rgba(56,189,248,.06);
 transform:translateY(-1px)}
-.kit-tile .ti-icon{font-size:20px}
-.kit-tile .ti-name{font-weight:700;font-size:12.5px;color:#e2e8f0;line-height:1.3}
-.kit-tile .ti-desc{font-size:10.5px;color:#64748b;line-height:1.4}
+.kit-tile:active{transform:scale(.985)}
+.kit-tile .ti-icon{font-size:20px;line-height:1}
+.kit-tile .ti-name{font-weight:700;font-size:12.5px;color:var(--fg);line-height:1.3}
+.kit-tile .ti-desc{font-size:10.5px;color:var(--fg-dim);line-height:1.4}
 
 .tool-form{padding:14px;background:var(--bg);border-radius:12px;
 border:1px solid rgba(148,163,184,.1);margin-bottom:14px}
 .tool-form-head{display:flex;justify-content:space-between;align-items:flex-start;
 margin-bottom:12px;gap:10px;flex-wrap:wrap}
-.tool-form-head .title{font-weight:700;font-size:14px}
-.tool-form-head .subtitle{font-size:11.5px;color:#64748b;margin-top:2px}
+.tool-form-head .title{font-weight:700;font-size:14px;line-height:1.35}
+.tool-form-head .subtitle{font-size:11.5px;color:var(--fg-dim);margin-top:2px;line-height:1.5}
 .field{margin-bottom:10px}
-.field label{display:block;font-size:11px;color:#94a3b8;font-weight:600;
+.field label{display:block;font-size:11px;color:var(--fg-muted);font-weight:600;
 text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px}
 .field input,.field textarea,.field select{
-  width:100%;padding:11px 14px;background:#0b1220;color:#e2e8f0;
+  width:100%;padding:11px 14px;background:#0b1220;color:var(--fg);
   border:1px solid rgba(148,163,184,.2);border-radius:9px;
-  font-family:'JetBrains Mono',monospace;font-size:13px;outline:none;
-  transition:.15s;min-height:42px;-webkit-appearance:none;appearance:none}
+  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:13px;outline:none;
+  transition:border-color var(--t),box-shadow var(--t);
+  min-height:42px;-webkit-appearance:none;appearance:none}
 .field textarea{min-height:100px;resize:vertical;font-size:12px;line-height:1.5}
 .field select{
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'><path fill='%2394a3b8' d='M0 3l5 5 5-5z'/></svg>");
   background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;
   font-family:inherit;font-size:13px;cursor:pointer}
-.field select option{background:#0b1220;color:#e2e8f0}
+.field select option{background:#0b1220;color:var(--fg)}
 .field input:focus,.field textarea:focus,.field select:focus{
   border-color:rgba(56,189,248,.5);box-shadow:0 0 0 3px rgba(56,189,248,.1)}
 
 .tool-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;
 padding-top:12px;border-top:1px solid rgba(148,163,184,.1)}
-.tool-actions .btn{flex:1;justify-content:center;min-height:42px}
-@media(min-width:520px){.tool-actions .btn{flex:0 1 auto;padding:8px 18px}}
+.tool-actions .btn{flex:1 1 auto;justify-content:center;min-height:42px}
 
 .result-pre{padding:12px 14px;background:var(--bg);border-radius:10px;
-font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.6;
-color:#e2e8f0;overflow:auto;max-height:50vh;white-space:pre-wrap;
+font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11.5px;line-height:1.6;
+color:var(--fg);overflow:auto;max-height:50vh;white-space:pre-wrap;
 word-break:break-word;border:1px solid rgba(148,163,184,.1);
 -webkit-overflow-scrolling:touch}
 .result-msg{padding:14px;border-radius:10px;font-size:13px;line-height:1.5}
 .result-msg.ok{background:rgba(16,185,129,.1);border-left:3px solid #10b981;color:#10b981}
 .result-msg.warn{background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;color:#f59e0b}
-.result-msg.err{background:rgba(248,113,113,.1);border-left:3px solid #f87171;color:#f87171}
-.result-msg.info{background:rgba(56,189,248,.1);border-left:3px solid #38bdf8;color:#38bdf8}
+.result-msg.err{background:rgba(248,113,113,.1);border-left:3px solid var(--danger);color:var(--danger)}
+.result-msg.info{background:rgba(56,189,248,.1);border-left:3px solid var(--accent);color:var(--accent)}
 
 .result-kv{padding:8px 12px;background:var(--bg);border-radius:7px;
-margin-bottom:4px;font-family:'JetBrains Mono',monospace;font-size:12px;
-display:flex;gap:12px;align-items:flex-start;word-break:break-word}
-.result-kv .k{color:#38bdf8;font-weight:600;flex-shrink:0;min-width:80px}
-.result-kv .v{color:#e2e8f0;flex:1}
+margin-bottom:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;
+display:flex;gap:12px;align-items:flex-start;word-break:break-word;flex-wrap:wrap}
+.result-kv .k{color:var(--accent);font-weight:600;flex-shrink:0;min-width:80px}
+.result-kv .v{color:var(--fg);flex:1;min-width:0}
 
 .result-list{padding:6px 0}
 .result-list-item{padding:8px 12px;background:var(--bg);border-radius:7px;
-margin-bottom:4px;font-family:'JetBrains Mono',monospace;font-size:12px;
+margin-bottom:4px;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:12px;
 display:flex;gap:10px;align-items:center;word-break:break-word}
-.result-list-item a{color:#38bdf8;text-decoration:none;flex:1;overflow:hidden;
+.result-list-item a{color:var(--accent);text-decoration:none;flex:1;overflow:hidden;
 text-overflow:ellipsis}
 .result-list-item .badge{font-size:10px;padding:2px 8px;border-radius:5px;
-background:rgba(56,189,248,.12);color:#38bdf8;flex-shrink:0;font-weight:600}
+background:rgba(56,189,248,.12);color:var(--accent);flex-shrink:0;font-weight:600}
 
 .finding{padding:12px 14px;border-radius:10px;margin-bottom:8px;
-background:var(--bg);border-left:3px solid #38bdf8}
+background:var(--bg);border-left:3px solid var(--accent)}
 .finding.critical{border-left-color:#dc2626;background:rgba(220,38,38,.05)}
-.finding.high{border-left-color:#f87171;background:rgba(248,113,113,.05)}
+.finding.high{border-left-color:var(--danger);background:rgba(248,113,113,.05)}
 .finding.medium{border-left-color:#f59e0b;background:rgba(245,158,11,.05)}
-.finding.low{border-left-color:#38bdf8;background:rgba(56,189,248,.05)}
-.finding.info{border-left-color:#64748b}
+.finding.low{border-left-color:var(--accent);background:rgba(56,189,248,.05)}
+.finding.info{border-left-color:var(--fg-dim)}
 .finding-head{display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;
 flex-wrap:wrap}
 .finding-head .sev{font-size:9.5px;font-weight:800;padding:3px 8px;
 border-radius:5px;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
-.finding-head .sev.critical{background:rgba(220,38,38,.2);color:#f87171}
-.finding-head .sev.high{background:rgba(248,113,113,.15);color:#f87171}
+.finding-head .sev.critical{background:rgba(220,38,38,.2);color:var(--danger)}
+.finding-head .sev.high{background:rgba(248,113,113,.15);color:var(--danger)}
 .finding-head .sev.medium{background:rgba(245,158,11,.15);color:#f59e0b}
-.finding-head .sev.low{background:rgba(56,189,248,.15);color:#38bdf8}
-.finding-head .sev.info{background:rgba(100,116,139,.2);color:#94a3b8}
-.finding-head .title{flex:1;font-weight:700;font-size:13px;line-height:1.35;min-width:0}
-.finding-head .cwe{font-family:'JetBrains Mono',monospace;font-size:10px;color:#64748b}
-.finding-desc{font-size:12px;color:#94a3b8;line-height:1.55;margin-bottom:8px}
+.finding-head .sev.low{background:rgba(56,189,248,.15);color:var(--accent)}
+.finding-head .sev.info{background:rgba(100,116,139,.2);color:var(--fg-muted)}
+.finding-head .title{flex:1;font-weight:700;font-size:13px;line-height:1.35;min-width:0;word-break:break-word}
+.finding-head .cwe{font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--fg-dim)}
+.finding-desc{font-size:12px;color:var(--fg-muted);line-height:1.55;margin-bottom:8px}
 .finding-evidence{padding:8px 10px;background:rgba(2,6,23,.6);border-radius:7px;
-font-family:'JetBrains Mono',monospace;font-size:11px;color:#94a3b8;
+font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;color:var(--fg-muted);
 word-break:break-word;white-space:pre-wrap;margin-bottom:6px;
 border:1px solid rgba(148,163,184,.08);max-height:200px;overflow:auto}
-.finding-remediation{font-size:11.5px;color:#38bdf8;line-height:1.5;
+.finding-remediation{font-size:11.5px;color:var(--accent);line-height:1.5;
 padding-top:6px;border-top:1px dashed rgba(148,163,184,.15)}
 .finding-meta{display:flex;gap:10px;flex-wrap:wrap;font-size:10.5px;
-color:#64748b;margin-top:6px;font-family:'JetBrains Mono',monospace}
+color:var(--fg-dim);margin-top:6px;font-family:'JetBrains Mono',ui-monospace,monospace}
 
 .report-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(72px,1fr));
 gap:8px;margin-bottom:16px}
@@ -510,82 +675,91 @@ gap:8px;margin-bottom:16px}
 text-align:center;border:1px solid rgba(148,163,184,.1)}
 .report-stat .n{font-size:22px;font-weight:800;line-height:1}
 .report-stat .l{font-size:9.5px;text-transform:uppercase;letter-spacing:.08em;
-color:#94a3b8;margin-top:3px;font-weight:700}
+color:var(--fg-muted);margin-top:3px;font-weight:700}
 .report-stat.critical .n{color:#dc2626}
-.report-stat.high .n{color:#f87171}
+.report-stat.high .n{color:var(--danger)}
 .report-stat.medium .n{color:#f59e0b}
-.report-stat.low .n{color:#38bdf8}
-.report-stat.info .n{color:#64748b}
+.report-stat.low .n{color:var(--accent)}
+.report-stat.info .n{color:var(--fg-dim)}
 
 .callout{padding:12px 14px;border-radius:10px;font-size:12px;line-height:1.6;
 margin-bottom:14px}
-.callout.warn{background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;color:#94a3b8}
-.callout.info{background:rgba(56,189,248,.08);border-left:3px solid #38bdf8;color:#94a3b8}
-.callout b{color:#38bdf8}
+.callout.warn{background:rgba(245,158,11,.1);border-left:3px solid #f59e0b;color:var(--fg-muted)}
+.callout.info{background:rgba(56,189,248,.08);border-left:3px solid var(--accent);color:var(--fg-muted)}
+.callout b{color:var(--accent)}
 
 .spinner-inline{display:inline-block;width:14px;height:14px;
-border:2px solid rgba(148,163,184,.2);border-top-color:#38bdf8;
+border:2px solid rgba(148,163,184,.2);border-top-color:var(--accent);
 border-radius:50%;animation:__lynkspin .8s linear infinite;vertical-align:middle}
 @keyframes __lynkspin{to{transform:rotate(360deg)}}
 
+/* ---------------- context menu ---------------- */
 .ctx-menu{position:fixed;background:var(--bg-2);border:1px solid rgba(148,163,184,.22);
-border-radius:11px;padding:6px;min-width:220px;
+border-radius:11px;padding:6px;min-width:220px;max-width:calc(100vw - 24px);
 box-shadow:0 30px 60px -10px rgba(0,0,0,.8);
 z-index:99999;display:none;animation:__lynkfade .12s ease}
 .ctx-menu.show{display:block}
 .ctx-item{display:flex;align-items:center;gap:10px;padding:11px 12px;
-border-radius:7px;color:#e2e8f0;font-size:13.5px;font-weight:500;
-cursor:pointer;transition:.1s;user-select:none}
-.ctx-item:hover{background:rgba(56,189,248,.12);color:#38bdf8}
-.ctx-item.danger:hover{background:rgba(248,113,113,.15);color:#f87171}
+border-radius:7px;color:var(--fg);font-size:13.5px;font-weight:500;
+cursor:pointer;transition:background var(--t),color var(--t);user-select:none;
+min-height:40px}
+.ctx-item:hover{background:rgba(56,189,248,.12);color:var(--accent)}
+.ctx-item.danger:hover{background:rgba(248,113,113,.15);color:var(--danger)}
 .ctx-item.disabled{opacity:.4;cursor:not-allowed;pointer-events:none}
 .ctx-item .k{flex:1}
-.ctx-item .shortcut{color:#64748b;font-family:'JetBrains Mono',monospace;font-size:11px}
+.ctx-item .shortcut{color:var(--fg-dim);font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px}
 .ctx-sep{height:1px;background:rgba(148,163,184,.14);margin:5px 4px}
 
+/* ---------------- search modal ---------------- */
 .search-modal{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;
 display:none;align-items:flex-start;justify-content:center;
 padding:calc(80px + var(--safe-t)) 16px 16px;
--webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+padding-left:calc(16px + var(--safe-l));
+padding-right:calc(16px + var(--safe-r))}
 .search-modal.show{display:flex;animation:__lynkfade .18s ease}
 .search-modal .box{background:var(--bg-2);border:1px solid rgba(148,163,184,.2);
-border-radius:16px;padding:20px;width:100%;max-width:680px;
+border-radius:16px;padding:clamp(16px,3vw,20px);width:100%;max-width:680px;
 box-shadow:0 40px 80px -20px rgba(0,0,0,.8)}
-.search-modal .label{font-size:11px;color:#94a3b8;letter-spacing:.14em;
+.search-modal .label{font-size:11px;color:var(--fg-muted);letter-spacing:.14em;
 text-transform:uppercase;font-weight:700;margin-bottom:10px}
 .search-modal form{display:flex;gap:6px;align-items:center;background:var(--bg);
 border:1px solid rgba(148,163,184,.2);border-radius:12px;padding:4px 4px 4px 14px;
 flex-wrap:wrap}
-.search-modal input{flex:1;min-width:160px;background:transparent;border:none;
-outline:none;color:#e2e8f0;font-family:inherit;font-size:15px;padding:12px 0}
-.search-modal select{background:transparent;border:none;color:#94a3b8;
-font-family:inherit;font-size:13px;padding:8px 6px;cursor:pointer}
-.search-modal select option{background:var(--bg-2);color:#e2e8f0}
+.search-modal input{flex:1 1 160px;min-width:0;background:transparent;border:none;
+outline:none;color:var(--fg);font-family:inherit;font-size:15px;padding:12px 0}
+.search-modal select{background:transparent;border:none;color:var(--fg-muted);
+font-family:inherit;font-size:13px;padding:8px 6px;cursor:pointer;max-width:140px}
+.search-modal select option{background:var(--bg-2);color:var(--fg)}
 
+/* ---------------- toast ---------------- */
 .toast{position:fixed;bottom:calc(24px + var(--safe-b));left:50%;
 transform:translateX(-50%) translateY(80px);
 background:var(--bg-2);border:1px solid rgba(148,163,184,.22);
-color:#e2e8f0;padding:12px 20px;border-radius:11px;
+color:var(--fg);padding:12px 20px;border-radius:11px;
 font-size:13px;font-weight:600;box-shadow:0 20px 40px -12px rgba(0,0,0,.7);
 z-index:99998;opacity:0;
-transition:transform .24s cubic-bezier(.34,1.36,.64,1),opacity .2s;
+transition:transform var(--t-bounce),opacity .2s;
 pointer-events:none;display:flex;align-items:center;gap:10px;
-max-width:90vw}
+max-width:calc(100vw - 24px)}
 .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
-.toast .undo{color:#38bdf8;cursor:pointer;font-weight:700;
+.toast .undo{color:var(--accent);cursor:pointer;font-weight:700;
 text-decoration:underline;margin-left:6px;pointer-events:auto}
 
 @keyframes __lynkfade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
 
+/* ---------------- responsive ---------------- */
 @media (hover:none){
   .tab .close{width:28px;height:28px;font-size:18px}
   .nav-btn{min-width:40px;min-height:40px}
   .btn{min-height:38px}
+  .ctx-item{min-height:44px}
 }
+
 @media(max-width:820px){
   .brand span{display:none}
   .btn-label{display:none}
-  .kit-grid{grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:6px}
+  .kit-grid{grid-template-columns:repeat(auto-fill,minmax(min(100%,130px),1fr));gap:6px}
   .kit-tile{padding:10px;min-height:96px}
   .kit-tile .ti-icon{font-size:18px}
   .kit-tile .ti-name{font-size:11.5px}
@@ -594,51 +768,69 @@ text-decoration:underline;margin-left:6px;pointer-events:auto}
 @media (min-width:821px) and (max-width:1100px){
   .kit-grid{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
 }
+
 @media(max-width:520px){
-  header{padding:6px 8px;gap:6px;
+  header{
+    padding:6px 8px;gap:6px;
     padding-left:calc(8px + var(--safe-l));
-    padding-right:calc(8px + var(--safe-r));}
+    padding-right:calc(8px + var(--safe-r));
+  }
   .tab{max-width:130px;min-width:70px;padding:0 3px 0 8px;font-size:11.5px;height:30px}
   .tab .close{width:22px;height:22px;font-size:14px}
-  .url-bar{padding:6px 8px;gap:4px;
+  .url-bar{
+    padding:6px 8px;gap:4px;
     padding-left:calc(8px + var(--safe-l));
-    padding-right:calc(8px + var(--safe-r));}
-  .nav-btn{padding:6px 8px;min-width:32px;min-height:32px;font-size:13px}
+    padding-right:calc(8px + var(--safe-r));
+  }
+  .nav-btn{padding:6px 8px;min-width:34px;min-height:34px;font-size:13px}
   .url-bar input{padding:9px 11px;font-size:12px}
   .btn{padding:6px 10px;font-size:11.5px;min-height:32px}
-  .drawer{width:100vw;border-radius:0}
-  .drawer-body{padding:12px}
+  .drawer{width:100vw;border-radius:0;border-left:none;border-right:none}
+  .drawer.left{border-right:none}
+  .drawer-body{padding:12px;padding-left:calc(12px + var(--safe-l));
+    padding-right:calc(12px + var(--safe-r))}
   .scraper-match{padding:10px}
-  .scraper-match .actions button{padding:6px 9px;font-size:10.5px}
+  .scraper-match .actions button{padding:7px 10px;font-size:11px;min-height:32px}
   .kit-tabs{gap:2px;padding:3px}
-  .kit-tab{padding:7px 11px;font-size:11.5px}
+  .kit-tab{padding:8px 12px;font-size:12px;min-height:38px}
   .finding{padding:10px 12px}
   .finding-head .title{font-size:12.5px}
-  .tool-actions .btn{flex:1;padding:10px 12px;font-size:12.5px}
+  .tool-actions .btn{flex:1 1 auto;padding:10px 12px;font-size:12.5px}
+  .tool-form{padding:12px}
+  .search-modal{padding:calc(60px + var(--safe-t)) 12px 12px}
 }
+
 @media (max-width:420px){
   .brand{display:none}
-  .tab{max-width:110px;min-width:60px}
+  .tab{max-width:110px;min-width:64px}
+  .url-bar{gap:3px}
+  .nav-btn{min-width:32px;min-height:32px;padding:5px 7px}
+}
+
+@media (max-width:360px){
+  .tab{max-width:90px;min-width:56px;font-size:11px}
+  .newtab-inline{width:30px;height:30px;font-size:16px}
 }
 </style></head><body>
 
 <header>
   <div class="brand"><div class="brand-mark">L</div><span>Lynk</span></div>
   <div class="tabs" id="tablist"></div>
-  <button class="newtab-inline" id="newtab" title="New tab (Ctrl+T)">+</button>
+  <button class="newtab-inline" id="newtab" title="New tab (Ctrl+T)" aria-label="New tab">+</button>
   <button class="btn" id="openScraper" title="Keyword scraper (Ctrl+F)">
     <span>🔎</span><span class="btn-label">Scrape</span></button>
   <button class="btn" id="openKit" title="Toolkit (Ctrl+B)">
     <span>🛠</span><span class="btn-label">Kit</span></button>
-  <button class="btn icon" id="openSearch" title="Search (Ctrl+K)">⌘</button>
-  <a href="/" class="btn icon" style="text-decoration:none" title="Home">⌂</a>
+  <button class="btn icon" id="openSearch" title="Search (Ctrl+K)" aria-label="Search">⌘</button>
+  <a href="/" class="btn icon" style="text-decoration:none" title="Home" aria-label="Home">⌂</a>
 </header>
 
 <div class="url-bar">
-  <button class="nav-btn" id="back" title="Back" disabled>←</button>
-  <button class="nav-btn" id="forward" title="Forward" disabled>→</button>
-  <button class="nav-btn" id="reload" title="Reload">⟳</button>
-  <input id="url" placeholder="Type a URL or search…" spellcheck="false" autocomplete="off">
+  <button class="nav-btn" id="back" title="Back" aria-label="Back" disabled>←</button>
+  <button class="nav-btn" id="forward" title="Forward" aria-label="Forward" disabled>→</button>
+  <button class="nav-btn" id="reload" title="Reload" aria-label="Reload">⟳</button>
+  <input id="url" placeholder="Type a URL or search…" spellcheck="false" autocomplete="off"
+         autocapitalize="off" inputmode="url" aria-label="URL">
   <button class="btn primary" id="go">Go</button>
 </div>
 
@@ -653,14 +845,15 @@ text-decoration:underline;margin-left:6px;pointer-events:auto}
   </div>
 </div>
 
-<aside class="drawer left" id="scraperDrawer">
+<aside class="drawer left" id="scraperDrawer" aria-hidden="true">
   <div class="drawer-header">
     <div class="drawer-title"><div class="mark">🔎</div><span>Keyword Scraper</span></div>
-    <button class="drawer-close" id="scraperClose">✕</button>
+    <button class="drawer-close" id="scraperClose" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body">
     <div class="scraper-search">
-      <input id="scrapeInput" placeholder="keyword, regex, or /pattern/flags" autocomplete="off">
+      <input id="scrapeInput" placeholder="keyword, regex, or /pattern/flags"
+             autocomplete="off" autocapitalize="off" spellcheck="false">
       <button class="btn primary" id="scrapeBtn">Scan all</button>
     </div>
     <div class="scraper-filters" id="scrapeFilters">
@@ -669,9 +862,9 @@ text-decoration:underline;margin-left:6px;pointer-events:auto}
       <span class="scraper-filter" data-mode="case">Case sensitive</span>
       <span class="scraper-filter" data-mode="whole">Whole word</span>
     </div>
-    <div id="scrapeStats" style="display:none;margin-bottom:12px;font-size:12px;color:#94a3b8">
-      <span><strong id="scrapeCount" style="color:#38bdf8">0</strong> matches</span>
-      <span id="scrapeTabsInfo" style="margin-left:8px;color:#64748b"></span>
+    <div id="scrapeStats" style="display:none;margin-bottom:12px;font-size:12px;color:var(--fg-muted)">
+      <span><strong id="scrapeCount" style="color:var(--accent)">0</strong> matches</span>
+      <span id="scrapeTabsInfo" style="margin-left:8px;color:var(--fg-dim)"></span>
       <button class="btn small" id="scrapeClear" style="float:right;margin-left:6px">Clear</button>
       <button class="btn small" id="scrapeExport" style="float:right">Export</button>
     </div>
@@ -679,22 +872,23 @@ text-decoration:underline;margin-left:6px;pointer-events:auto}
   </div>
 </aside>
 
-<aside class="drawer right" id="kitDrawer">
+<aside class="drawer right" id="kitDrawer" aria-hidden="true">
   <div class="drawer-header">
     <div class="drawer-title"><div class="mark">🛠</div><span>Offensive Toolkit</span></div>
-    <button class="drawer-close" id="kitClose">✕</button>
+    <button class="drawer-close" id="kitClose" aria-label="Close">✕</button>
   </div>
   <div class="drawer-body" id="kitBody"></div>
 </aside>
 
-<div class="ctx-menu" id="ctxMenu"></div>
+<div class="ctx-menu" id="ctxMenu" role="menu"></div>
 
 <div class="search-modal" id="searchModal">
   <div class="box">
     <div class="label">Quick search</div>
     <form id="searchForm">
-      <input id="searchQ" placeholder="search the web…" autocomplete="off" required>
-      <select id="searchEngine">__OPTS__</select>
+      <input id="searchQ" placeholder="search the web…" autocomplete="off"
+             autocapitalize="off" spellcheck="false" required aria-label="Search query">
+      <select id="searchEngine" aria-label="Search engine">__OPTS__</select>
       <button type="submit" class="btn primary">Search</button>
     </form>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
@@ -704,7 +898,7 @@ text-decoration:underline;margin-left:6px;pointer-events:auto}
   </div>
 </div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script>
 (function(){
@@ -927,7 +1121,8 @@ function openCtx(x, y, tabId){
   function mk(icon, label, h, sc, variant, disabled){
     var el = document.createElement('div');
     el.className = 'ctx-item' + (variant?' '+variant:'') + (disabled?' disabled':'');
-    el.innerHTML = '<span style="width:14px;text-align:center;color:#64748b">'+icon+'</span>'
+    el.setAttribute('role','menuitem');
+    el.innerHTML = '<span style="width:14px;text-align:center;color:var(--fg-dim)">'+icon+'</span>'
       + '<span class="k">'+label+'</span>'
       + (sc ? '<span class="shortcut">'+sc+'</span>' : '');
     if (!disabled) el.addEventListener('click', function(){ hideCtx(); h(); });
@@ -947,6 +1142,8 @@ function openCtx(x, y, tabId){
   var r = ctxMenu.getBoundingClientRect();
   if (x + r.width > window.innerWidth - 8) x = window.innerWidth - r.width - 8;
   if (y + r.height > window.innerHeight - 8) y = window.innerHeight - r.height - 8;
+  if (x < 8) x = 8;
+  if (y < 8) y = 8;
   ctxMenu.style.left = x + 'px'; ctxMenu.style.top = y + 'px';
 }
 function hideCtx(){ ctxMenu.classList.remove('show'); }
@@ -1131,7 +1328,7 @@ function inlineEdit(m, idx){
     mark.removeEventListener('blur', once);
     mark.contentEditable = 'false';
     mark.style.outline = ''; mark.style.background = 'rgba(56,189,248,.25)';
-    mark.style.color = '#38bdf8'; mark.style.padding = '1px 3px';
+    mark.style.color = 'var(--accent)'; mark.style.padding = '1px 3px';
     var newText = mark.textContent;
     try {
       var node = m.node; var t = node.nodeValue;
@@ -1220,7 +1417,7 @@ document.body.appendChild(kScript);
 
 
 # ======================================================================
-# KIT_JS — served at /tool/kit.js (tabs-shell toolkit)
+# KIT_JS — served at /tool/kit.js
 # ======================================================================
 KIT_JS = r"""
 (function(){
@@ -2415,7 +2612,7 @@ reg('recon', {
     var r = await backendPost('/tool/subdomains', { domain: inp.domain });
     if (!r.data || r.data.error) throw new Error((r.data && r.data.error) || 'failed');
     var subs = r.data.subdomains || [];
-    var html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">'
+    var html = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'
       + '<span style="color:#38bdf8;font-weight:700">'+subs.length+' subdomains</span>'
       + '<button class="btn small" id="kit-subs-dl">⬇ Download</button></div>';
     subs.forEach(function(s){
@@ -2960,7 +3157,7 @@ function renderTools(root){
   search.value = filterText;
   search.style.cssText = 'width:100%;padding:10px 14px;background:#070b16;color:#e2e8f0;'
     +'border:1px solid rgba(148,163,184,.2);border-radius:9px;font-family:inherit;'
-    +'font-size:12.5px;outline:none;margin-bottom:14px';
+    +'font-size:12.5px;outline:none;margin-bottom:14px;min-height:42px';
   search.oninput = function(){ filterText = search.value; renderTools(root); };
   root.innerHTML = '';
   root.appendChild(search);
@@ -3018,7 +3215,7 @@ function renderToolView(root){
 
   var form = document.createElement('div');
   form.className = 'tool-form';
-  form.innerHTML = '<div class="tool-form-head"><div>'
+  form.innerHTML = '<div class="tool-form-head"><div style="min-width:0">'
     +'<div class="title">'+esc(t.icon||'')+' '+esc(t.name)+'</div>'
     +'<div class="subtitle">'+esc(t.description||'')+'</div></div></div>';
 
@@ -3128,7 +3325,7 @@ function renderTabsView(root){
       + 'padding:10px 12px;margin-bottom:6px;border-radius:10px;'
       + 'background:' + (isActive?'rgba(56,189,248,.08)':'#070b16') + ';'
       + 'border:1px solid ' + (isActive?'rgba(56,189,248,.35)':'rgba(148,163,184,.1)') + ';'
-      + 'transition:.15s">'
+      + 'transition:.15s;flex-wrap:nowrap">'
       + '<span style="color:#64748b;font-family:\'JetBrains Mono\',monospace;'
       +   'font-size:11px;width:22px;text-align:center;flex-shrink:0">'
       +   (i+1) + '</span>'
@@ -3205,7 +3402,7 @@ function renderFindings(root){
     return (order[a.severity]||5) - (order[b.severity]||5);
   });
   var html = '<div class="report-summary">'+summary+'</div>';
-  html += '<div style="display:flex;gap:6px;margin-bottom:12px">'
+  html += '<div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">'
     + '<button class="btn small" id="kit-findings-dl">⬇ Export JSON</button>'
     + '<button class="btn small" id="kit-findings-md">⬇ Export MD</button>'
     + '<button class="btn small" id="kit-findings-clear">Clear</button>'
@@ -3279,7 +3476,7 @@ function renderReport(root){
       + '</div>';
   }).join('');
   root.innerHTML = '<div class="report-summary">'+summary+'</div>'
-    + '<div style="display:flex;gap:6px;margin-bottom:14px">'
+    + '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">'
     + '<button class="btn small" id="kit-report-html">⬇ Full HTML report</button>'
     + '<button class="btn small" id="kit-report-json">⬇ JSON</button>'
     + '</div>'
@@ -3328,7 +3525,7 @@ render();
 
 
 # ======================================================================
-# PANEL_JS — the 45-tool panel injected into proxied pages (unchanged)
+# PANEL_JS — injected into proxied pages (responsive)
 # ======================================================================
 PANEL_JS = r"""
 (function(){
@@ -3338,6 +3535,8 @@ var upstream = ctx.upstream || '';
 if (!upstream) return;
 var upEnc = encodeURIComponent(upstream);
 
+function isNarrow(){ return window.innerWidth <= 640; }
+
 function ensureModal(){
   var m = document.getElementById('__lynk_modal');
   if (m) return m;
@@ -3346,31 +3545,34 @@ function ensureModal(){
   m.setAttribute('role','dialog');
   m.setAttribute('aria-modal','true');
   m.style.cssText = 'position:fixed;inset:0;background:rgba(2,6,23,.82);z-index:2147483647;'
-    +'display:none;align-items:center;justify-content:center;padding:20px;'
-    +'backdrop-filter:blur(6px);animation:__lynkfade .18s ease';
+    +'display:none;align-items:center;justify-content:center;padding:12px;'
+    +'backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);'
+    +'animation:__lynkfade .18s ease;box-sizing:border-box';
   m.innerHTML = '<div id="__lynk_mwrap" style="background:#0d1526;'
     +'border:1px solid rgba(148,163,184,.18);border-radius:16px;'
     +'max-width:1200px;width:100%;max-height:92vh;display:flex;flex-direction:column;'
     +'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,sans-serif;color:#e2e8f0;'
     +'overflow:hidden;box-shadow:0 40px 80px -20px rgba(0,0,0,.8),0 0 0 1px rgba(56,189,248,.08);'
-    +'animation:__lynkslide .22s cubic-bezier(.34,1.36,.64,1)">'
-    +'<div style="padding:16px 20px;border-bottom:1px solid rgba(148,163,184,.18);'
+    +'animation:__lynkslide .22s cubic-bezier(.34,1.36,.64,1);box-sizing:border-box">'
+    +'<div style="padding:14px 16px;border-bottom:1px solid rgba(148,163,184,.18);'
     +'display:flex;justify-content:space-between;align-items:center;flex-shrink:0;'
-    +'background:linear-gradient(180deg,rgba(56,189,248,.05),transparent)">'
-      +'<div style="display:flex;align-items:center;gap:10px">'
-        +'<div id="__lynk_micon" style="width:32px;height:32px;border-radius:9px;'
+    +'gap:10px;background:linear-gradient(180deg,rgba(56,189,248,.05),transparent)">'
+      +'<div style="display:flex;align-items:center;gap:10px;min-width:0">'
+        +'<div id="__lynk_micon" style="width:32px;height:32px;border-radius:9px;flex-shrink:0;'
         +'background:linear-gradient(135deg,#38bdf8,#818cf8);display:grid;place-items:center;'
         +'color:#0b1220;font-size:16px;font-weight:800">L</div>'
-        +'<div><div id="__lynk_mtitle" style="font-weight:700;font-size:15px;letter-spacing:-.01em"></div>'
-        +'<div id="__lynk_msub" style="font-size:11px;color:#64748b;margin-top:1px"></div></div>'
+        +'<div style="min-width:0"><div id="__lynk_mtitle" style="font-weight:700;font-size:15px;'
+        +'letter-spacing:-.01em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>'
+        +'<div id="__lynk_msub" style="font-size:11px;color:#64748b;margin-top:1px;'
+        +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div></div>'
       +'</div>'
       +'<button id="__lynk_mclose" aria-label="Close" style="background:rgba(148,163,184,.08);'
-      +'border:none;color:#94a3b8;width:32px;height:32px;border-radius:9px;font-size:16px;'
-      +'cursor:pointer;display:grid;place-items:center;transition:.15s">✕</button>'
+      +'border:none;color:#94a3b8;width:34px;height:34px;border-radius:9px;font-size:16px;'
+      +'cursor:pointer;display:grid;place-items:center;transition:.15s;flex-shrink:0;padding:0">✕</button>'
     +'</div>'
-    +'<div id="__lynk_mbody" style="padding:20px;overflow:auto;flex:1;font-size:13px;'
-    +'scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.3) transparent"></div>'
-    +'<div id="__lynk_mfoot" style="padding:12px 20px;border-top:1px solid rgba(148,163,184,.14);'
+    +'<div id="__lynk_mbody" style="padding:16px;overflow:auto;flex:1;font-size:13px;'
+    +'-webkit-overflow-scrolling:touch;box-sizing:border-box"></div>'
+    +'<div id="__lynk_mfoot" style="padding:12px 16px;border-top:1px solid rgba(148,163,184,.14);'
     +'display:none;flex-shrink:0;justify-content:flex-end;gap:8px;background:rgba(2,6,23,.4)"></div>'
     +'</div>';
   document.body.appendChild(m);
@@ -3378,7 +3580,9 @@ function ensureModal(){
     var s = document.createElement('style'); s.id = '__lynkanim';
     s.textContent = '@keyframes __lynkfade{from{opacity:0}to{opacity:1}}'
       +'@keyframes __lynkslide{from{transform:translateY(24px) scale(.98);opacity:0}'
-      +'to{transform:translateY(0) scale(1);opacity:1}}';
+      +'to{transform:translateY(0) scale(1);opacity:1}}'
+      +'@media(max-width:640px){#__lynk_mwrap{border-radius:12px !important;max-height:94vh !important}'
+      +'#__lynk_mbody{padding:12px !important}}';
     document.head.appendChild(s);
   }
   m.querySelector('#__lynk_mclose').onclick = function(){ m.style.display='none'; };
@@ -3424,7 +3628,10 @@ fab.setAttribute('role','button');
 fab.setAttribute('tabindex','0');
 fab.setAttribute('aria-label','Open toolkit');
 fab.innerHTML = '🛠';
-fab.style.cssText = 'position:fixed;bottom:18px;right:18px;width:56px;height:56px;'
+fab.style.cssText = 'position:fixed;'
+  +'bottom:calc(18px + env(safe-area-inset-bottom,0px));'
+  +'right:calc(18px + env(safe-area-inset-right,0px));'
+  +'width:56px;height:56px;'
   +'border-radius:50%;background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
   +'display:grid;place-items:center;font-size:26px;cursor:pointer;'
   +'box-shadow:0 12px 32px -8px rgba(56,189,248,.6),0 0 0 4px rgba(56,189,248,.12);'
@@ -3438,44 +3645,55 @@ document.body.appendChild(fab);
 // ---------- Panel ----------
 var panel = document.createElement('aside');
 panel.setAttribute('role','complementary');
-panel.style.cssText = 'position:fixed;top:38px;right:-460px;width:460px;'
-  +'height:calc(100% - 38px);background:#0d1526;'
+function applyPanelWidth(){
+  var w = isNarrow() ? window.innerWidth : 460;
+  panel.style.width = w + 'px';
+  panel.style.right = -(w + 2) + 'px';
+}
+panel.style.cssText = 'position:fixed;top:0;'
+  +'height:100vh;height:100dvh;background:#0d1526;'
   +'border-left:1px solid rgba(148,163,184,.16);'
   +'font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Inter,sans-serif;'
   +'color:#e2e8f0;z-index:2147483646;transition:right .26s cubic-bezier(.34,1.36,.64,1);'
-  +'display:flex;flex-direction:column;overflow:hidden;'
+  +'display:flex;flex-direction:column;overflow:hidden;box-sizing:border-box;'
   +'box-shadow:-24px 0 60px -20px rgba(0,0,0,.7)';
 panel.innerHTML = ''
-  +'<div style="padding:16px 18px;border-bottom:1px solid rgba(148,163,184,.16);'
+  +'<div style="padding:14px 16px;border-bottom:1px solid rgba(148,163,184,.16);'
    +'display:flex;align-items:center;justify-content:space-between;flex-shrink:0;'
-   +'background:linear-gradient(180deg,rgba(56,189,248,.06),transparent)">'
-    +'<div><div style="font-size:10px;color:#64748b;letter-spacing:.14em;font-weight:700">LYNKIO</div>'
-    +'<div style="font-weight:800;font-size:16px;letter-spacing:-.01em;margin-top:2px">Offensive Toolkit</div></div>'
+   +'padding-top:calc(14px + env(safe-area-inset-top,0px));'
+   +'padding-left:calc(16px + env(safe-area-inset-left,0px));'
+   +'padding-right:calc(16px + env(safe-area-inset-right,0px));'
+   +'background:linear-gradient(180deg,rgba(56,189,248,.06),transparent);gap:10px">'
+    +'<div style="min-width:0"><div style="font-size:10px;color:#64748b;letter-spacing:.14em;font-weight:700">LYNKIO</div>'
+    +'<div style="font-weight:800;font-size:16px;letter-spacing:-.01em;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Offensive Toolkit</div></div>'
     +'<button id="__lynk_close" aria-label="Close panel" style="background:rgba(148,163,184,.08);'
-    +'border:none;color:#94a3b8;width:30px;height:30px;border-radius:8px;font-size:15px;'
-    +'cursor:pointer">✕</button>'
+    +'border:none;color:#94a3b8;width:34px;height:34px;border-radius:9px;font-size:15px;'
+    +'cursor:pointer;flex-shrink:0;display:grid;place-items:center;padding:0">✕</button>'
   +'</div>'
-  +'<div id="__lynk_target" style="padding:10px 18px;font-size:11px;color:#94a3b8;'
+  +'<div id="__lynk_target" style="padding:10px 16px;font-size:11px;color:#94a3b8;'
    +'border-bottom:1px solid rgba(148,163,184,.16);white-space:nowrap;overflow:hidden;'
    +'text-overflow:ellipsis;flex-shrink:0;font-family:ui-monospace,monospace" '
    +'title="'+escHtml(upstream)+'">'+escHtml(upstream)+'</div>'
   +'<div style="padding:10px 12px 6px;flex-shrink:0">'
     +'<input id="__lynk_filter" placeholder="Filter tools…" style="width:100%;'
-    +'padding:9px 12px;background:#070b16;color:#e2e8f0;border:1px solid rgba(148,163,184,.2);'
-    +'border-radius:9px;font-family:inherit;font-size:12.5px;outline:none"/>'
+    +'padding:10px 12px;background:#070b16;color:#e2e8f0;border:1px solid rgba(148,163,184,.2);'
+    +'border-radius:9px;font-family:inherit;font-size:12.5px;outline:none;box-sizing:border-box;'
+    +'min-height:42px"/>'
   +'</div>'
   +'<nav id="__lynk_nav" style="flex:1;overflow-y:auto;padding:4px 6px 6px;'
-   +'scrollbar-width:thin;scrollbar-color:rgba(148,163,184,.3) transparent"></nav>'
+   +'-webkit-overflow-scrolling:touch"></nav>'
   +'<div style="padding:10px 12px;border-top:1px solid rgba(148,163,184,.16);'
+   +'padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));'
    +'display:flex;gap:6px;flex-shrink:0">'
-    +'<button id="__lynk_home" style="flex:1;padding:10px;border-radius:9px;'
+    +'<button id="__lynk_home" style="flex:1;padding:12px;border-radius:9px;'
     +'border:none;background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
-    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:12.5px">⌂ Home</button>'
-    +'<button id="__lynk_tabs" style="padding:10px 14px;border-radius:9px;'
+    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:12.5px;min-height:44px">⌂ Home</button>'
+    +'<button id="__lynk_tabs" style="padding:12px 16px;border-radius:9px;'
     +'border:1px solid rgba(148,163,184,.22);background:transparent;color:#e2e8f0;'
-    +'cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600">🗂️</button>'
+    +'cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;min-height:44px">🗂️</button>'
   +'</div>';
 document.body.appendChild(panel);
+applyPanelWidth();
 
 var SECTIONS = [
   ['Recon & Fingerprint', [
@@ -3582,9 +3800,10 @@ function renderNav(filter){
       var b = document.createElement('button');
       b.dataset.tool = id;
       b.style.cssText = 'display:flex;align-items:flex-start;gap:12px;width:100%;'
-        +'padding:10px 12px;border-radius:9px;background:transparent;border:none;'
+        +'padding:12px;border-radius:9px;background:transparent;border:none;'
         +'color:#e2e8f0;font-family:inherit;font-size:13px;text-align:left;cursor:pointer;'
-        +'transition:background .12s;';
+        +'transition:background .12s;box-sizing:border-box;min-height:44px;'
+        +'-webkit-appearance:none;appearance:none;';
       b.innerHTML = '<span style="font-size:16px;width:22px;text-align:center;flex-shrink:0;'
         +'margin-top:1px">'+ic+'</span>'
         +'<span style="flex:1;min-width:0">'
@@ -3607,13 +3826,31 @@ panel.querySelector('#__lynk_filter').addEventListener('input', function(e){
   renderNav(e.target.value);
 });
 
-function openPanel(){ panel.style.right='0'; fab.style.display='none'; }
-function closePanel(){ panel.style.right='-460px'; fab.style.display='grid'; }
+function openPanel(){
+  var w = isNarrow() ? window.innerWidth : 460;
+  panel.style.width = w + 'px';
+  panel.style.right = '0';
+  fab.style.display='none';
+}
+function closePanel(){
+  var w = isNarrow() ? window.innerWidth : 460;
+  panel.style.right = -(w + 2) + 'px';
+  fab.style.display='grid';
+}
 fab.onclick = openPanel;
 window.__LYNK_OPEN_TOOLS__ = openPanel;
 panel.querySelector('#__lynk_close').onclick = closePanel;
 panel.querySelector('#__lynk_home').onclick = function(){ location.href='/'; };
 panel.querySelector('#__lynk_tabs').onclick = function(){ window.open('/tabs','_blank'); };
+
+window.addEventListener('resize', function(){
+  if (isNarrow()){
+    var w = window.innerWidth;
+    panel.style.width = w + 'px';
+    if (panel.style.right === '0px') panel.style.right = '0';
+    else panel.style.right = -(w + 2) + 'px';
+  }
+});
 
 function openTool(id){
   switch(id){
@@ -3690,7 +3927,7 @@ async function toolText(title, endpoint){
     body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
       +'overflow:auto;max-height:62vh;font-family:ui-monospace,Monaco,monospace;'
       +'font-size:11.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;'
-      +'border:1px solid rgba(148,163,184,.1)">'+escHtml(t)+'</pre>';
+      +'border:1px solid rgba(148,163,184,.1);box-sizing:border-box">'+escHtml(t)+'</pre>';
   } catch(e){
     body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>';
   }
@@ -3698,7 +3935,7 @@ async function toolText(title, endpoint){
 
 async function toolVulnScan(){
   var body = showModal('Vulnerability Scan',
-    '<div style="text-align:center;padding:30px 0">'
+    '<div style="text-align:center;padding:20px 0">'
     +'<div style="font-size:52px;margin-bottom:16px;filter:drop-shadow(0 8px 20px rgba(56,189,248,.4))">🛡️</div>'
     +'<div style="color:#94a3b8;margin-bottom:6px;font-size:14px">Target</div>'
     +'<div style="font-family:ui-monospace,monospace;color:#38bdf8;margin-bottom:22px;'
@@ -3706,12 +3943,12 @@ async function toolVulnScan(){
     +'<div style="display:flex;justify-content:center;margin-bottom:18px">'
       +'<label style="font-size:13px;color:#94a3b8;display:flex;gap:8px;align-items:center;'
       +'cursor:pointer;user-select:none">'
-      +'<input type="checkbox" id="__vactive" checked style="width:16px;height:16px;'
+      +'<input type="checkbox" id="__vactive" checked style="width:18px;height:18px;'
       +'accent-color:#38bdf8"> Active probes (paths · methods · CORS)</label>'
     +'</div>'
-    +'<button id="__vstart" class="__lynk_btn" style="padding:13px 32px;border-radius:11px;'
+    +'<button id="__vstart" class="__lynk_btn" style="padding:14px 32px;border-radius:11px;'
     +'border:none;background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
-    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;'
+    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:14px;min-height:48px;'
     +'box-shadow:0 12px 24px -10px rgba(56,189,248,.5);transition:.15s">Start Scan</button>'
     +'</div>');
   var btn = body.querySelector('#__vstart');
@@ -3742,22 +3979,22 @@ function renderVulnReport(body, data){
                info:'rgba(100,116,139,.12)'};
   var summary = Object.keys(counts).map(function(k){
     if (!counts[k]) return '';
-    return '<div style="padding:12px 20px;background:'+sevBg[k]+';border:1px solid '+sevColor[k]+'22;'
-      +'border-radius:11px;min-width:84px;text-align:center">'
-      +'<div style="font-size:24px;font-weight:800;color:'+sevColor[k]+'">'+counts[k]+'</div>'
+    return '<div style="padding:12px 16px;background:'+sevBg[k]+';border:1px solid '+sevColor[k]+'22;'
+      +'border-radius:11px;min-width:76px;text-align:center;flex:1 1 auto">'
+      +'<div style="font-size:22px;font-weight:800;color:'+sevColor[k]+'">'+counts[k]+'</div>'
       +'<div style="font-size:10.5px;color:#94a3b8;text-transform:uppercase;'
       +'letter-spacing:.08em;font-weight:700">'+k+'</div></div>';
   }).join('');
   var sections = f.map(function(x){
     return '<div style="padding:14px 16px;border-radius:11px;margin-bottom:8px;'
       +'background:#070b16;border-left:3px solid '+sevColor[x.severity]+'">'
-      +'<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px">'
+      +'<div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:6px;flex-wrap:wrap">'
         +'<span style="font-size:10px;font-weight:700;padding:3px 9px;border-radius:5px;'
          +'background:'+sevBg[x.severity]+';color:'+sevColor[x.severity]
          +';text-transform:uppercase;letter-spacing:.06em;white-space:nowrap;'
          +'flex-shrink:0">'+x.severity+'</span>'
-        +'<span style="flex:1;font-weight:600;font-size:13.5px;line-height:1.4">'
-         +escHtml(x.name)+'</span>'
+        +'<span style="flex:1;font-weight:600;font-size:13.5px;line-height:1.4;min-width:0;'
+         +'word-break:break-word">'+escHtml(x.name)+'</span>'
         +'<span style="font-family:ui-monospace,monospace;font-size:10.5px;'
          +'color:#64748b;flex-shrink:0">'+escHtml(x.id)+'</span>'
       +'</div>'
@@ -3765,8 +4002,8 @@ function renderVulnReport(body, data){
         +escHtml(x.description)+'</div>'
       +(x.evidence?'<pre style="padding:10px 12px;background:rgba(2,6,23,.6);'
          +'border-radius:7px;font-family:ui-monospace,monospace;font-size:11px;'
-         +'color:#94a3b8;word-break:break-word;margin-bottom:8px;white-space:pre-wrap">'
-         +escHtml(x.evidence)+'</pre>':'')
+         +'color:#94a3b8;word-break:break-word;margin-bottom:8px;white-space:pre-wrap;'
+         +'overflow:auto;box-sizing:border-box">'+escHtml(x.evidence)+'</pre>':'')
       +(x.remediation?'<div style="font-size:12px;color:#38bdf8;line-height:1.55;'
          +'padding-top:6px;border-top:1px dashed rgba(148,163,184,.15)">'
          +'<b>Fix:</b> '+escHtml(x.remediation)+'</div>':'')
@@ -3775,7 +4012,7 @@ function renderVulnReport(body, data){
   body.innerHTML = ''
     +'<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px">'+summary+'</div>'
     +'<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap">'
-      +'<button id="__vdl" style="padding:6px 12px;border-radius:7px;'
+      +'<button id="__vdl" style="padding:8px 14px;border-radius:7px;'
       +'border:1px solid rgba(148,163,184,.3);background:transparent;color:#e2e8f0;'
       +'cursor:pointer;font-family:inherit;font-size:11.5px;font-weight:600">Download JSON</button>'
       +'<span style="margin-left:auto;color:#64748b;font-size:12px;align-self:center">'
@@ -3786,11 +4023,6 @@ function renderVulnReport(body, data){
   body.querySelector('#__vdl').onclick = function(){ dl('vulnscan.json',JSON.stringify(data,null,2)); };
 }
 
-// ---------- Stub implementations of remaining panel tools ----------
-// (The full implementations from v13 are preserved; only the entry points are listed
-//  here for brevity in this reproduction. Every function referenced in openTool()
-//  exists below.)
-
 async function showDirViewer(url){
   var body = showModal('Directory Viewer',
     '<div style="color:#94a3b8;text-align:center;padding:30px">Loading '+escHtml(url)+'…</div>');
@@ -3799,15 +4031,16 @@ async function showDirViewer(url){
     var data = await r.json();
     if (data.kind === 'listing'){
       body.innerHTML = data.entries.map(function(e){
-        return '<div style="padding:8px 12px;background:#070b16;border-radius:7px;'
-          +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:12px">'
+        return '<div style="padding:10px 12px;background:#070b16;border-radius:7px;'
+          +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:12px;'
+          +'word-break:break-all">'
           +'<a href="/proxy?url='+encodeURIComponent(e.url)+'" '
           +'style="color:#38bdf8;text-decoration:none">'+escHtml(e.name)+'</a></div>';
       }).join('');
     } else {
       body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
         +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
-        +'word-break:break-word;max-height:62vh;overflow:auto">'
+        +'word-break:break-word;max-height:62vh;overflow:auto;box-sizing:border-box">'
         +escHtml(data.body||'')+'</pre>';
     }
   } catch(e){
@@ -3818,12 +4051,12 @@ async function showDirViewer(url){
 function toolSubdomains(){
   var body = showModal('Subdomain Enumeration',
     '<input id="__sdom" value="'+escHtml(urlparse(upstream).hostname)+'" '
-    +'style="width:100%;padding:11px 14px;background:#070b16;color:#e2e8f0;'
+    +'style="width:100%;padding:12px 14px;background:#070b16;color:#e2e8f0;'
     +'border:1px solid rgba(148,163,184,.2);border-radius:9px;font-family:ui-monospace,monospace;'
-    +'font-size:13px;outline:none"/>'
-    +'<button id="__sgo" style="margin-top:12px;padding:11px 24px;border-radius:9px;'
+    +'font-size:13px;outline:none;box-sizing:border-box;min-height:44px"/>'
+    +'<button id="__sgo" style="margin-top:12px;padding:12px 24px;border-radius:9px;'
     +'border:none;background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
-    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">Enumerate</button>'
+    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Enumerate</button>'
     +'<div id="__sout" style="margin-top:16px"></div>');
   var btn = body.querySelector('#__sgo');
   btn.onclick = async function(){
@@ -3839,9 +4072,9 @@ function toolSubdomains(){
         ? '<div style="color:#38bdf8;font-weight:700;font-size:13px;margin-bottom:8px">'
           +subs.length+' found</div>'
           +subs.map(function(s){
-            return '<div style="padding:7px 12px;background:#070b16;border-radius:6px;'
-              +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:12px">'
-              +escHtml(s)+'</div>';
+            return '<div style="padding:8px 12px;background:#070b16;border-radius:6px;'
+              +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:12px;'
+              +'word-break:break-all">'+escHtml(s)+'</div>';
           }).join('')
         : '<div style="color:#94a3b8">No subdomains found.</div>';
     } catch(e){
@@ -3853,9 +4086,9 @@ function toolSubdomains(){
 function toolPortScan(){
   var host = urlparse(upstream).hostname;
   var body = showModal('Port Scan',
-    '<button id="__pstart" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__pstart" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Scan ports</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Scan ports</button>'
     +'<div id="__pout" style="margin-top:16px"></div>');
   var btn = body.querySelector('#__pstart');
   btn.onclick = async function(){
@@ -3891,7 +4124,8 @@ async function toolSSL(){
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
       +'overflow:auto;font-family:ui-monospace,monospace;font-size:12px;'
-      +'line-height:1.6;border:1px solid rgba(148,163,184,.1)">'
+      +'line-height:1.6;border:1px solid rgba(148,163,184,.1);white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){
     body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>';
@@ -3899,7 +4133,7 @@ async function toolSSL(){
 }
 
 function toolTLSAudit(){
-  showModal('TLS Audit', '<div style="color:#94a3b8">Run the SSL/TLS Info tool for certificate details, '
+  showModal('TLS Audit', '<div style="color:#94a3b8;line-height:1.6">Run the SSL/TLS Info tool for certificate details, '
     +'then the Rate-Limit Stress tool to test connection limits.</div>');
 }
 
@@ -3909,26 +4143,27 @@ function toolInjection(kind, label){
     +'Non-destructive probe. Sends each payload once and flags any response that '
     +'meaningfully differs from a clean baseline.</div>'
     +'<div style="display:grid;grid-template-columns:1fr auto;gap:8px;margin-bottom:10px">'
-      +'<input id="__inj_url" value="'+escHtml(upstream)+'" style="padding:10px 12px;'
+      +'<input id="__inj_url" value="'+escHtml(upstream)+'" style="padding:11px 12px;'
       +'background:#070b16;color:#e2e8f0;border:1px solid rgba(148,163,184,.2);'
-      +'border-radius:8px;font-family:ui-monospace,monospace;font-size:12px;outline:none"/>'
-      +'<select id="__inj_method" style="padding:10px 12px;background:#070b16;color:#e2e8f0;'
+      +'border-radius:8px;font-family:ui-monospace,monospace;font-size:12px;outline:none;'
+      +'box-sizing:border-box;min-width:0"/>'
+      +'<select id="__inj_method" style="padding:11px 12px;background:#070b16;color:#e2e8f0;'
       +'border:1px solid rgba(148,163,184,.2);border-radius:8px;font-family:inherit;font-size:12px">'
       +'<option>GET</option><option>POST</option></select>'
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">'
       +'<input id="__inj_param" placeholder="param name" '
-      +'style="padding:10px 12px;background:#070b16;color:#e2e8f0;'
+      +'style="padding:11px 12px;background:#070b16;color:#e2e8f0;'
       +'border:1px solid rgba(148,163,184,.2);border-radius:8px;font-family:ui-monospace,monospace;'
-      +'font-size:12px;outline:none"/>'
+      +'font-size:12px;outline:none;box-sizing:border-box;min-width:0"/>'
       +'<input id="__inj_header" placeholder="or header name" '
-      +'style="padding:10px 12px;background:#070b16;color:#e2e8f0;'
+      +'style="padding:11px 12px;background:#070b16;color:#e2e8f0;'
       +'border:1px solid rgba(148,163,184,.2);border-radius:8px;font-family:ui-monospace,monospace;'
-      +'font-size:12px;outline:none"/>'
+      +'font-size:12px;outline:none;box-sizing:border-box;min-width:0"/>'
     +'</div>'
-    +'<button id="__inj_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    +'<button id="__inj_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Run probes</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Run probes</button>'
     +'<div id="__inj_out" style="margin-top:16px"></div>');
   var btn = body.querySelector('#__inj_run');
   btn.onclick = async function(){
@@ -3965,7 +4200,7 @@ function toolInjection(kind, label){
   };
 }
 
-function toolMassAssign(){ showModal('Mass Assignment','<div style="color:#94a3b8">Use the Kit drawer → Recon → Injection Probes for mass assignment testing.</div>'); }
+function toolMassAssign(){ showModal('Mass Assignment','<div style="color:#94a3b8;line-height:1.6">Use the Kit drawer → Recon → Injection Probes for mass assignment testing.</div>'); }
 function toolPrototype(){ showModal('Prototype Pollution','<div style="color:#94a3b8">Client-side check: '+(typeof ({}).polluted === 'undefined' ? '<span style="color:#10b981">prototype clean</span>' : '<span style="color:#f87171">polluted</span>')+'</div>'); }
 function toolDOMClobbering(){
   var hits = [];
@@ -3982,7 +4217,8 @@ async function toolSmuggling(){
     var r = await api('/tool/smuggling',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
@@ -3997,7 +4233,8 @@ async function toolCachePoison(){
       ? hits.map(function(x){
           return '<div style="padding:10px 12px;background:#070b16;border-radius:8px;'
             +'margin-bottom:6px;border-left:3px solid #f59e0b">'
-            +'<div style="font-family:ui-monospace,monospace;color:#38bdf8">'+escHtml(x.header)+'</div>'
+            +'<div style="font-family:ui-monospace,monospace;color:#38bdf8;'
+            +'word-break:break-all">'+escHtml(x.header)+'</div>'
             +'<div style="font-size:11.5px;color:#94a3b8">reflected</div></div>';
         }).join('')
       : '<div style="color:#10b981;padding:16px;text-align:center">No unkeyed header reflection.</div>';
@@ -4010,15 +4247,16 @@ async function toolCacheDeception(){
     var r = await api('/tool/cache-deception',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
 function toolHostHeader(){
   var body = showModal('Host Header Injection',
-    '<button id="__hh_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__hh_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Run probes</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Run probes</button>'
     +'<div id="__hh_out" style="margin-top:16px"></div>');
   body.querySelector('#__hh_run').onclick = async function(){
     var out = body.querySelector('#__hh_out');
@@ -4032,7 +4270,8 @@ function toolHostHeader(){
         ? hits.map(function(x){
             return '<div style="padding:10px 12px;background:#070b16;border-radius:8px;'
               +'margin-bottom:6px;border-left:3px solid #f87171">'
-              +'<div style="font-family:ui-monospace,monospace;color:#38bdf8">'
+              +'<div style="font-family:ui-monospace,monospace;color:#38bdf8;'
+              +'word-break:break-all">'
               +escHtml(x.header)+': '+escHtml(x.value)+'</div></div>';
           }).join('')
         : '<div style="color:#10b981;padding:16px;text-align:center">No host header reflection.</div>';
@@ -4041,9 +4280,9 @@ function toolHostHeader(){
 }
 function toolMethodOverride(){
   var body = showModal('Method Override',
-    '<button id="__mo_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__mo_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Probe</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Probe</button>'
     +'<div id="__mo_out" style="margin-top:16px"></div>');
   body.querySelector('#__mo_run').onclick = async function(){
     var out = body.querySelector('#__mo_out');
@@ -4055,7 +4294,7 @@ function toolMethodOverride(){
       out.innerHTML = (data.results||[]).map(function(x){
         return '<div style="padding:10px 12px;background:#070b16;border-radius:8px;'
           +'margin-bottom:6px"><div style="font-family:ui-monospace,monospace;'
-          +'font-size:11.5px;color:#38bdf8">'+escHtml(x.label)+'</div>'
+          +'font-size:11.5px;color:#38bdf8;word-break:break-all">'+escHtml(x.label)+'</div>'
           +'<div style="font-size:11.5px;color:#94a3b8">status: '+x.status
           +' · '+(x.differs?'<b style="color:#f59e0b">differs</b>':'no change')+'</div></div>';
       }).join('');
@@ -4064,9 +4303,9 @@ function toolMethodOverride(){
 }
 function toolRateLimit(){
   var body = showModal('Rate Limit Detection',
-    '<button id="__rl_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__rl_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Run</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Run</button>'
     +'<div id="__rl_out" style="margin-top:16px"></div>');
   body.querySelector('#__rl_run').onclick = async function(){
     var out = body.querySelector('#__rl_out');
@@ -4076,7 +4315,8 @@ function toolRateLimit(){
       var r = await api('/tool/ratelimit',{method:'POST',body:fd});
       var data = await r.json();
       out.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+        +'word-break:break-word;box-sizing:border-box">'
         +escHtml(JSON.stringify({hint:data.hint, headers:data.headers}, null, 2))+'</pre>';
     } catch(e){ out.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
   };
@@ -4091,8 +4331,8 @@ function toolCORSDeep(){
           return '<div style="padding:12px 14px;background:#070b16;border-radius:9px;'
             +'margin-bottom:8px;border-left:3px solid #f87171">'
             +'<div style="font-weight:700;color:#f87171">'+escHtml(x.name)+'</div>'
-            +'<div style="color:#94a3b8;font-size:12px;font-family:ui-monospace,monospace">'
-            +escHtml(x.evidence)+'</div></div>';
+            +'<div style="color:#94a3b8;font-size:12px;font-family:ui-monospace,monospace;'
+            +'word-break:break-all">'+escHtml(x.evidence)+'</div></div>';
         }).join('')
       : '<div style="color:#10b981;padding:20px;text-align:center">No CORS misconfiguration.</div>';
   }).catch(function(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; });
@@ -4104,7 +4344,8 @@ async function toolHSTSAudit(){
     var r = await api('/tool/hsts-audit',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
@@ -4112,10 +4353,11 @@ function toolJWT(){
   var body = showModal('JWT Analyzer',
     '<textarea id="__jwti" placeholder="eyJhbGciOiJIUzI1NiIs…" style="width:100%;height:120px;'
     +'background:#070b16;color:#e2e8f0;border:1px solid rgba(148,163,184,.2);border-radius:9px;'
-    +'padding:12px;font-family:ui-monospace,monospace;font-size:12px;outline:none"></textarea>'
-    +'<button id="__jwta" style="margin-top:12px;padding:11px 24px;border-radius:9px;border:none;'
+    +'padding:12px;font-family:ui-monospace,monospace;font-size:12px;outline:none;'
+    +'box-sizing:border-box;resize:vertical"></textarea>'
+    +'<button id="__jwta" style="margin-top:12px;padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Analyze</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Analyze</button>'
     +'<div id="__jwtout" style="margin-top:16px"></div>');
   body.querySelector('#__jwta').onclick = async function(){
     var tok = body.querySelector('#__jwti').value.trim();
@@ -4126,7 +4368,8 @@ function toolJWT(){
       var r = await api('/tool/jwt',{method:'POST',body:fd});
       var data = await r.json();
       out.innerHTML = '<pre style="background:#070b16;padding:12px;border-radius:8px;'
-        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+        +'word-break:break-word;box-sizing:border-box">'
         +escHtml(JSON.stringify(data,null,2))+'</pre>';
     } catch(e){ out.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
   };
@@ -4135,10 +4378,11 @@ function toolJWTAttack(){
   var body = showModal('JWT Attacks',
     '<textarea id="__jai" placeholder="Paste JWT…" style="width:100%;height:120px;'
     +'background:#070b16;color:#e2e8f0;border:1px solid rgba(148,163,184,.2);border-radius:9px;'
-    +'padding:12px;font-family:ui-monospace,monospace;font-size:12px;outline:none"></textarea>'
-    +'<button id="__ja_run" style="margin-top:12px;padding:11px 24px;border-radius:9px;border:none;'
+    +'padding:12px;font-family:ui-monospace,monospace;font-size:12px;outline:none;'
+    +'box-sizing:border-box;resize:vertical"></textarea>'
+    +'<button id="__ja_run" style="margin-top:12px;padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Generate variants</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Generate variants</button>'
     +'<div id="__ja_out" style="margin-top:16px"></div>');
   body.querySelector('#__ja_run').onclick = async function(){
     var tok = body.querySelector('#__jai').value.trim();
@@ -4157,7 +4401,7 @@ function toolJWTAttack(){
           +escHtml(v.description)+'</div>'
           +'<pre style="background:rgba(2,6,23,.7);padding:10px;border-radius:6px;'
           +'font-family:ui-monospace,monospace;font-size:11px;overflow:auto;'
-          +'white-space:pre-wrap;word-break:break-all">'+escHtml(v.token)+'</pre></div>';
+          +'white-space:pre-wrap;word-break:break-all;box-sizing:border-box">'+escHtml(v.token)+'</pre></div>';
       }).join('');
     } catch(e){ out.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
   };
@@ -4220,11 +4464,12 @@ function toolBrute(){
   var body = showModal('Directory Brute',
     '<textarea id="__bl" style="width:100%;height:170px;background:#070b16;color:#e2e8f0;'
     +'border:1px solid rgba(148,163,184,.2);border-radius:9px;padding:12px;'
-    +'font-family:ui-monospace,monospace;font-size:12px;outline:none;resize:vertical">'
+    +'font-family:ui-monospace,monospace;font-size:12px;outline:none;resize:vertical;'
+    +'box-sizing:border-box">'
     +escHtml('admin\napi\nlogin\nbackup.zip\nconfig.json\n.env\n.git/config\nrobots.txt\nwp-admin\nphpinfo.php\nswagger.json')+'</textarea>'
-    +'<button id="__rb" style="margin-top:12px;padding:11px 24px;border-radius:9px;border:none;'
+    +'<button id="__rb" style="margin-top:12px;padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Probe</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Probe</button>'
     +'<div id="__bo" style="margin-top:16px"></div>');
   body.querySelector('#__rb').onclick = async function(){
     var out = body.querySelector('#__bo');
@@ -4240,7 +4485,7 @@ function toolBrute(){
             return '<div style="display:flex;gap:10px;padding:8px 12px;background:#070b16;'
               +'border-radius:7px;margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px">'
               +'<span style="color:#10b981;font-weight:700">'+x.status+'</span>'
-              +'<span style="color:#e2e8f0">'+escHtml(x.path)+'</span></div>';
+              +'<span style="color:#e2e8f0;word-break:break-all">'+escHtml(x.path)+'</span></div>';
           }).join('')
         : '<div style="color:#94a3b8">No interesting paths.</div>';
     } catch(e){ out.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
@@ -4256,9 +4501,9 @@ async function toolJSEndpoints(){
     var eps = data.endpoints || [];
     body.innerHTML = eps.length
       ? eps.map(function(e){
-          return '<div style="padding:7px 12px;background:#070b16;border-radius:6px;'
-            +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:11.5px">'
-            +escHtml(e.absolute)+'</div>';
+          return '<div style="padding:8px 12px;background:#070b16;border-radius:6px;'
+            +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:11.5px;'
+            +'word-break:break-all">'+escHtml(e.absolute)+'</div>';
         }).join('')
       : '<div style="color:#94a3b8">No endpoints found.</div>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
@@ -4269,16 +4514,16 @@ function toolSourceMap(){
   body.innerHTML = '<div style="color:#38bdf8;font-weight:700;margin-bottom:10px">'
     +scripts.length+' scripts loaded</div>'
     +scripts.map(function(s){
-      return '<div style="padding:6px 10px;background:#070b16;border-radius:6px;'
+      return '<div style="padding:8px 12px;background:#070b16;border-radius:6px;'
         +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:11px;'
         +'word-break:break-all">'+escHtml(s)+'</div>';
     }).join('');
 }
 function toolGraphQL(){
   var body = showModal('GraphQL Introspection',
-    '<button id="__gqla" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__gqla" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Introspect</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Introspect</button>'
     +'<div id="__gqlout" style="margin-top:16px"></div>');
   body.querySelector('#__gqla').onclick = async function(){
     var out = body.querySelector('#__gqlout');
@@ -4288,7 +4533,8 @@ function toolGraphQL(){
       var r = await api('/tool/graphql',{method:'POST',body:fd});
       var data = await r.json();
       out.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+        +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+        +'word-break:break-word;box-sizing:border-box">'
         +escHtml(JSON.stringify(data,null,2))+'</pre>';
     } catch(e){ out.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
   };
@@ -4298,7 +4544,8 @@ function toolGraphQLFuzz(){
   var fd = new FormData(); fd.append('url', upstream);
   api('/tool/graphql-fuzz',{method:'POST',body:fd}).then(function(r){return r.json()}).then(function(data){
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   }).catch(function(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; });
 }
@@ -4311,8 +4558,8 @@ function toolAPIDiscover(){
       ? hits.map(function(x){
           return '<div style="padding:8px 12px;background:#070b16;border-radius:7px;'
             +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px;'
-            +'display:flex;gap:10px">'
-            +'<span style="color:#38bdf8;width:40px">'+x.status+'</span>'
+            +'display:flex;gap:10px;word-break:break-all">'
+            +'<span style="color:#38bdf8;flex-shrink:0;min-width:32px">'+x.status+'</span>'
             +'<span style="color:#e2e8f0">'+escHtml(x.path)+'</span></div>';
         }).join('')
       : '<div style="color:#94a3b8">No API paths found.</div>';
@@ -4320,9 +4567,9 @@ function toolAPIDiscover(){
 }
 function toolParamDiscovery(){
   var body = showModal('Parameter Discovery',
-    '<button id="__pd_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__pd_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Probe</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Probe</button>'
     +'<div id="__pd_out" style="margin-top:16px"></div>');
   body.querySelector('#__pd_run').onclick = async function(){
     var out = body.querySelector('#__pd_out');
@@ -4336,7 +4583,8 @@ function toolParamDiscovery(){
         ? hits.map(function(x){
             return '<div style="padding:10px 12px;background:#070b16;border-radius:8px;'
               +'margin-bottom:5px;border-left:3px solid #f59e0b">'
-              +'<div style="font-family:ui-monospace,monospace;color:#38bdf8">'
+              +'<div style="font-family:ui-monospace,monospace;color:#38bdf8;'
+              +'word-break:break-all">'
               +escHtml(x.name)+'</div></div>';
           }).join('')
         : '<div style="color:#94a3b8">No interesting parameters.</div>';
@@ -4351,12 +4599,12 @@ function toolLinks(){
     +links.length+' links · '+forms.length+' forms</div>'
     +forms.map(function(f){
       return '<div style="padding:8px 12px;background:#070b16;border-radius:7px;'
-        +'margin-bottom:6px;font-family:ui-monospace,monospace;font-size:11.5px">'
+        +'margin-bottom:6px;font-family:ui-monospace,monospace;font-size:11.5px;'
+        +'word-break:break-all">'
         +'<span style="color:#f59e0b">'+(f.method||'GET').toUpperCase()+'</span> '
         +escHtml(f.action||'(current)')+'</div>';
     }).join('');
 }
-// DOM Explorer: kept brief for this reproduction
 function toolDOMExplorer(){
   var body = showModal('DOM Explorer','');
   var divs = Array.from(document.querySelectorAll('div')).slice(0, 60);
@@ -4368,7 +4616,7 @@ function toolDOMExplorer(){
         ? '.'+d.className.trim().split(/\s+/).slice(0,2).join('.') : '';
       return '<div style="padding:6px 10px;background:#070b16;border-radius:6px;'
         +'margin-bottom:3px;font-family:ui-monospace,monospace;font-size:11.5px;'
-        +'color:#38bdf8">div'+escHtml(id+cls)+'</div>';
+        +'color:#38bdf8;word-break:break-all">div'+escHtml(id+cls)+'</div>';
     }).join('');
 }
 async function toolDiag(){
@@ -4377,7 +4625,8 @@ async function toolDiag(){
     var r = await api('/tool/diag?url='+upEnc);
     var d = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-      +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(d,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
@@ -4385,7 +4634,8 @@ async function toolDNS(){
   var body = showModal('DNS / IP','<div style="color:#94a3b8">Resolving…</div>');
   var data = await apiJSON('/tool/dns?url='+upEnc);
   body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap">'
+    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;'
+    +'word-break:break-word;box-sizing:border-box">'
     +escHtml(JSON.stringify(data,null,2))+'</pre>';
 }
 async function toolDNSDeep(){
@@ -4395,7 +4645,8 @@ async function toolDNSDeep(){
     var r = await api('/tool/dns-deep',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-      +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
@@ -4403,14 +4654,16 @@ async function toolHeaders(){
   var body = showModal('Response Headers','<div style="color:#94a3b8">Fetching…</div>');
   var data = await apiJSON('/tool/headers?url='+upEnc);
   body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap">'
+    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;'
+    +'word-break:break-word;box-sizing:border-box">'
     +escHtml(JSON.stringify(data,null,2))+'</pre>';
 }
 async function toolScan(){
   var body = showModal('Tech Fingerprint','<div style="color:#94a3b8">Scanning…</div>');
   var data = await apiJSON('/tool/scan?url='+upEnc);
   body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap">'
+    +'font-family:ui-monospace,monospace;font-size:12px;white-space:pre-wrap;'
+    +'word-break:break-word;box-sizing:border-box">'
     +escHtml(JSON.stringify(data,null,2))+'</pre>';
 }
 async function toolSource(){
@@ -4418,22 +4671,24 @@ async function toolSource(){
   var r = await api('/tool/source?url='+upEnc); var txt = await r.text();
   body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
     +'overflow:auto;max-height:62vh;font-family:ui-monospace,monospace;font-size:11.5px;'
-    +'white-space:pre-wrap;word-break:break-word">'+escHtml(txt.slice(0,200000))+'</pre>';
+    +'white-space:pre-wrap;word-break:break-word;box-sizing:border-box">'
+    +escHtml(txt.slice(0,200000))+'</pre>';
 }
 async function toolEdit(){
   var body = showModal('Edit Source','<div style="color:#94a3b8">Loading…</div>');
   var r = await api('/tool/source?url='+upEnc); var txt = await r.text();
   body.innerHTML = '<textarea id="__edbox" style="width:100%;height:52vh;background:#070b16;'
     +'color:#e2e8f0;border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:14px;'
-    +'font-family:ui-monospace,monospace;font-size:11.5px;outline:none;resize:vertical">'
+    +'font-family:ui-monospace,monospace;font-size:11.5px;outline:none;resize:vertical;'
+    +'box-sizing:border-box">'
     +escHtml(txt)+'</textarea>'
-    +'<div style="display:flex;gap:8px;margin-top:12px">'
-    +'<button id="__sv" style="flex:1;padding:11px;border-radius:9px;border:none;'
+    +'<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">'
+    +'<button id="__sv" style="flex:1;padding:12px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
-    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:13px">Save & reload</button>'
-    +'<button id="__rv" style="padding:11px 18px;border-radius:9px;'
+    +'font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Save & reload</button>'
+    +'<button id="__rv" style="padding:12px 18px;border-radius:9px;'
     +'border:1px solid rgba(148,163,184,.3);background:transparent;color:#e2e8f0;'
-    +'cursor:pointer;font-family:inherit;font-size:12px;font-weight:600">Revert</button></div>';
+    +'cursor:pointer;font-family:inherit;font-size:12px;font-weight:600;min-height:44px">Revert</button></div>';
   body.querySelector('#__sv').onclick = async function(){
     var fd = new FormData(); fd.append('url', upstream); fd.append('html', body.querySelector('#__edbox').value);
     await api('/tool/source/save',{method:'POST',body:fd});
@@ -4460,11 +4715,11 @@ function toolCSS(){
   var body = showModal('Live CSS',
     '<textarea id="__css" style="width:100%;height:46vh;background:#070b16;color:#e2e8f0;'
     +'border:1px solid rgba(148,163,184,.2);border-radius:10px;padding:14px;'
-    +'font-family:ui-monospace,monospace;font-size:12.5px;outline:none" '
-    +'placeholder="body { background: #000 !important; }"></textarea>'
-    +'<button id="__app" style="margin-top:12px;padding:11px 24px;border-radius:9px;border:none;'
+    +'font-family:ui-monospace,monospace;font-size:12.5px;outline:none;box-sizing:border-box;'
+    +'resize:vertical" placeholder="body { background: #000 !important; }"></textarea>'
+    +'<button id="__app" style="margin-top:12px;padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Apply</button>');
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Apply</button>');
   body.querySelector('#__app').onclick = function(){
     var el = document.getElementById('__lynk_css');
     if (!el){ el = document.createElement('style'); el.id = '__lynk_css'; document.head.appendChild(el); }
@@ -4475,7 +4730,7 @@ function toolCookies(){
   var body = showModal('Cookie Manager','');
   var cookies = document.cookie.split(';').map(function(c){return c.trim();}).filter(Boolean);
   body.innerHTML = cookies.map(function(c){
-    return '<div style="padding:9px 12px;border-radius:7px;background:#070b16;'
+    return '<div style="padding:10px 12px;border-radius:7px;background:#070b16;'
       +'margin-bottom:6px;font-family:ui-monospace,monospace;font-size:12px;'
       +'word-break:break-all">'+escHtml(c)+'</div>';
   }).join('') || '<div style="color:#94a3b8">No cookies.</div>';
@@ -4483,7 +4738,8 @@ function toolCookies(){
 function toolStorage(){
   var body = showModal('Storage','');
   body.innerHTML = '<pre style="background:#070b16;padding:16px;border-radius:10px;'
-    +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+    +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+    +'word-break:break-word;box-sizing:border-box">'
     +escHtml(JSON.stringify({
       localStorage: Object.fromEntries(Object.entries(localStorage)),
       sessionStorage: Object.fromEntries(Object.entries(sessionStorage)),
@@ -4494,12 +4750,13 @@ function toolAgent(){
     '<textarea id="__agentcode" placeholder="Python or JS…" '
     +'style="width:100%;height:220px;background:#070b16;color:#e2e8f0;'
     +'border:1px solid rgba(148,163,184,.2);border-radius:9px;padding:12px;'
-    +'font-family:ui-monospace,monospace;font-size:12px;outline:none"></textarea>'
-    +'<button id="__agentrun" style="margin-top:14px;padding:11px 24px;border-radius:9px;border:none;'
+    +'font-family:ui-monospace,monospace;font-size:12px;outline:none;box-sizing:border-box;'
+    +'resize:vertical"></textarea>'
+    +'<button id="__agentrun" style="margin-top:14px;padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Run (Python/server)</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Run (Python/server)</button>'
     +'<div id="__agentout" style="margin-top:14px;font-family:ui-monospace,monospace;'
-    +'font-size:11.5px;color:#94a3b8"></div>');
+    +'font-size:11.5px;color:#94a3b8;word-break:break-all"></div>');
   body.querySelector('#__agentrun').onclick = async function(){
     var code = body.querySelector('#__agentcode').value;
     var out = body.querySelector('#__agentout');
@@ -4525,9 +4782,9 @@ async function toolHistory(){
 
 function toolWellKnown(){
   var body = showModal('Well-Known Probe',
-    '<button id="__wk_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    '<button id="__wk_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Probe</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Probe</button>'
     +'<div id="__wk_out" style="margin-top:16px"></div>');
   body.querySelector('#__wk_run').onclick = async function(){
     var out = body.querySelector('#__wk_out');
@@ -4540,7 +4797,8 @@ function toolWellKnown(){
       out.innerHTML = hits.length
         ? hits.map(function(x){
             return '<div style="padding:8px 12px;background:#070b16;border-radius:7px;'
-              +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px">'
+              +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px;'
+              +'word-break:break-all">'
               +escHtml(x.path)+' <span style="color:#64748b">('+x.length+'B)</span></div>';
           }).join('')
         : '<div style="color:#94a3b8">Nothing found.</div>';
@@ -4555,7 +4813,8 @@ async function toolWAF(){
     var r = await api('/tool/waf',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
@@ -4570,7 +4829,8 @@ async function toolWayback(){
     body.innerHTML = s.length
       ? s.map(function(x){
           return '<div style="padding:8px 12px;background:#070b16;border-radius:7px;'
-            +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px">'
+            +'margin-bottom:4px;font-family:ui-monospace,monospace;font-size:11.5px;'
+            +'word-break:break-all">'
             +'<span style="color:#64748b">'+escHtml(x.timestamp)+'</span> '
             +escHtml(x.url)+'</div>';
         }).join('')
@@ -4585,12 +4845,12 @@ async function toolFavicon(){
     var r = await api('/tool/favicon',{method:'POST',body:fd});
     var data = await r.json();
     body.innerHTML = '<pre style="background:#070b16;padding:14px;border-radius:9px;'
-      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap">'
+      +'font-family:ui-monospace,monospace;font-size:11.5px;white-space:pre-wrap;'
+      +'word-break:break-word;box-sizing:border-box">'
       +escHtml(JSON.stringify(data,null,2))+'</pre>';
   } catch(e){ body.innerHTML = '<div style="color:#f87171">'+escHtml(e.message)+'</div>'; }
 }
 
-// ---------- RATE LIMIT STRESS (from PANEL_JS) ----------
 function toolRateLimitStress(){
   var body = showModal('Rate-Limit Stress',
     '<div class="callout info" style="padding:12px 14px;background:rgba(56,189,248,.08);'
@@ -4599,27 +4859,31 @@ function toolRateLimitStress(){
     +'<b style="color:#38bdf8">Bounded probe.</b> Measures where the target throttles. '
     +'Hard caps: ≤20 concurrent, ≤500 total, ≤50 RPS. '
     +'Honours <code>Retry-After</code>, aborts after N consecutive 429s.</div>'
-    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px">'
       +'<label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#94a3b8">'
         +'Total<input id="__rs_total" type="number" value="100" min="1" max="500" '
-        +'style="padding:9px 10px;background:#070b16;color:#e2e8f0;'
-        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px"/></label>'
+        +'style="padding:10px;background:#070b16;color:#e2e8f0;'
+        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px;'
+        +'box-sizing:border-box;min-width:0"/></label>'
       +'<label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#94a3b8">'
         +'Concurrency<input id="__rs_conc" type="number" value="5" min="1" max="20" '
-        +'style="padding:9px 10px;background:#070b16;color:#e2e8f0;'
-        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px"/></label>'
+        +'style="padding:10px;background:#070b16;color:#e2e8f0;'
+        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px;'
+        +'box-sizing:border-box;min-width:0"/></label>'
       +'<label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#94a3b8">'
         +'Max RPS<input id="__rs_rps" type="number" value="10" min="0.5" max="50" step="0.5" '
-        +'style="padding:9px 10px;background:#070b16;color:#e2e8f0;'
-        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px"/></label>'
+        +'style="padding:10px;background:#070b16;color:#e2e8f0;'
+        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px;'
+        +'box-sizing:border-box;min-width:0"/></label>'
       +'<label style="display:flex;flex-direction:column;gap:4px;font-size:11px;color:#94a3b8">'
         +'Abort after N×429<input id="__rs_abort" type="number" value="5" min="1" max="50" '
-        +'style="padding:9px 10px;background:#070b16;color:#e2e8f0;'
-        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px"/></label>'
+        +'style="padding:10px;background:#070b16;color:#e2e8f0;'
+        +'border:1px solid rgba(148,163,184,.2);border-radius:7px;font-size:12px;'
+        +'box-sizing:border-box;min-width:0"/></label>'
     +'</div>'
-    +'<button id="__rs_run" style="padding:11px 24px;border-radius:9px;border:none;'
+    +'<button id="__rs_run" style="padding:12px 24px;border-radius:9px;border:none;'
     +'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;font-weight:700;'
-    +'cursor:pointer;font-family:inherit;font-size:13px">Run bounded probe</button>'
+    +'cursor:pointer;font-family:inherit;font-size:13px;min-height:44px">Run bounded probe</button>'
     +'<div id="__rs_out" style="margin-top:16px"></div>');
   body.querySelector('#__rs_run').onclick = async function(){
     var out = body.querySelector('#__rs_out');
@@ -4643,16 +4907,16 @@ function toolRateLimitStress(){
           +'<span style="color:#e2e8f0">'+d.status_counts[k]+'</span></div>';
       }).join('');
       out.innerHTML = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">'
-        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center">'
+        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center;flex:1 1 auto">'
         +'<div style="font-size:20px;font-weight:800;color:#38bdf8">'+d.sent+'</div>'
         +'<div style="font-size:10.5px;color:#64748b;text-transform:uppercase">sent</div></div>'
-        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center">'
+        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center;flex:1 1 auto">'
         +'<div style="font-size:20px;font-weight:800;color:#10b981">'+d.p50+'ms</div>'
         +'<div style="font-size:10.5px;color:#64748b;text-transform:uppercase">p50</div></div>'
-        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center">'
+        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center;flex:1 1 auto">'
         +'<div style="font-size:20px;font-weight:800;color:#f59e0b">'+d.p95+'ms</div>'
         +'<div style="font-size:10.5px;color:#64748b;text-transform:uppercase">p95</div></div>'
-        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center">'
+        +'<div style="padding:10px 16px;background:#070b16;border-radius:9px;text-align:center;flex:1 1 auto">'
         +'<div style="font-size:20px;font-weight:800;color:#f87171">'+d.p99+'ms</div>'
         +'<div style="font-size:10.5px;color:#64748b;text-transform:uppercase">p99</div></div>'
         +'</div>'
@@ -4683,15 +4947,12 @@ window.__LYNK_ENGINES__ = {};
 
 
 # ======================================================================
-# TABBAR_JS — no-op stub (the tabs shell handles its own tab bar)
+# TABBAR_JS — no-op stub
 # ======================================================================
 TABBAR_JS = r"""
 (function(){
 if(window.__LYNK_SHELL__) return;
 window.__LYNK_SHELL__ = true;
-// The multi-tab shell at /tabs provides its own tab bar; proxied pages
-// don't need an additional one. This file exists so /tool/tabbar.js
-// doesn't 404 in pages that reference it.
 })();
 """
 
@@ -5400,21 +5661,42 @@ def resolve_origin(req, sess):
 
 def error_page(title, message, status=500):
     html = (
-        '<!DOCTYPE html><html><head><meta charset="utf-8">'
+        '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">'
+        '<meta name="theme-color" content="#070b16">'
+        '<meta name="color-scheme" content="dark">'
         f'<title>{esc(title)} · Lynk</title><style>'
-        'body{font-family:Inter,system-ui,sans-serif;background:#070b16;color:#e2e8f0;'
-        'display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px}'
-        '.card{background:rgba(15,23,42,.68);border:1px solid rgba(148,163,184,.16);'
-        'border-radius:20px;max-width:520px;width:100%;padding:32px;text-align:center;'
-        'backdrop-filter:blur(20px);box-shadow:0 30px 60px -20px rgba(0,0,0,.55)}'
-        '.ic{width:56px;height:56px;border-radius:16px;display:inline-grid;place-items:center;'
-        'font-size:1.5rem;margin-bottom:18px;'
-        'background:linear-gradient(135deg,rgba(248,113,113,.2),rgba(239,68,68,.1));'
-        'border:1px solid rgba(248,113,113,.25)}'
-        'h1{font-size:1.35rem;margin:0 0 8px}'
-        'p{color:#94a3b8;font-size:.92rem;line-height:1.55;margin:0 0 22px;word-break:break-word}'
-        'a{display:inline-flex;gap:6px;background:linear-gradient(135deg,#38bdf8,#818cf8);'
-        'color:#0b1220;padding:11px 20px;border-radius:10px;font-weight:700;text-decoration:none}'
+        ':root{--safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);'
+        '--safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px)}'
+        '*{box-sizing:border-box;margin:0;padding:0}'
+        'body{font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;'
+        'background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(56,189,248,.09),transparent 70%),#070b16;'
+        'color:#e2e8f0;display:flex;align-items:center;justify-content:center;'
+        'min-height:100vh;min-height:100dvh;'
+        'padding:calc(24px + var(--safe-t)) calc(20px + var(--safe-r)) calc(24px + var(--safe-b)) calc(20px + var(--safe-l));'
+        '-webkit-font-smoothing:antialiased;line-height:1.5}'
+        '.card{background:rgba(13,21,38,.72);border:1px solid rgba(148,163,184,.16);'
+        'border-radius:20px;max-width:520px;width:100%;padding:clamp(24px,6vw,36px);'
+        'text-align:center;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);'
+        'box-shadow:0 30px 60px -20px rgba(0,0,0,.55),0 0 0 1px rgba(56,189,248,.05)}'
+        '.ic{width:60px;height:60px;border-radius:16px;display:inline-grid;place-items:center;'
+        'font-size:26px;margin-bottom:18px;'
+        'background:linear-gradient(135deg,rgba(248,113,113,.2),rgba(239,68,68,.08));'
+        'border:1px solid rgba(248,113,113,.25);'
+        'box-shadow:0 12px 30px -12px rgba(248,113,113,.5)}'
+        'h1{font-size:clamp(19px,4.5vw,24px);font-weight:800;letter-spacing:-.02em;'
+        'margin:0 0 10px;line-height:1.2}'
+        'p{color:#94a3b8;font-size:clamp(13px,3vw,14.5px);line-height:1.6;'
+        'margin:0 0 24px;word-break:break-word}'
+        'code{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:.9em;'
+        'background:rgba(2,6,23,.6);padding:2px 7px;border-radius:5px;color:#38bdf8;'
+        'word-break:break-all}'
+        'a{display:inline-flex;gap:8px;align-items:center;'
+        'background:linear-gradient(135deg,#38bdf8,#818cf8);color:#0b1220;'
+        'padding:12px 22px;border-radius:11px;font-weight:700;text-decoration:none;'
+        'font-size:14px;transition:filter .18s,transform .18s;min-height:44px}'
+        'a:hover{filter:brightness(1.08);transform:translateY(-1px)}'
+        'a:active{transform:translateY(0) scale(.98)}'
         '</style></head><body><div class="card">'
         f'<div class="ic">⚠</div><h1>{esc(title)}</h1><p>{message}</p>'
         '<a href="/">← Back to Lynk</a></div></body></html>'
@@ -5504,12 +5786,15 @@ window.__LYNK_UI__ = (function(){
     };
     var c = colors[kind] || colors.info;
     var el = document.createElement('div');
-    el.style.cssText = 'position:fixed;bottom:'+(80+toasts.length*56)+'px;right:24px;'
+    el.style.cssText = 'position:fixed;'
+      +'bottom:calc('+(80+toasts.length*56)+'px + env(safe-area-inset-bottom,0px));'
+      +'right:calc(16px + env(safe-area-inset-right,0px));'
       +'background:'+c.bg+';border:1px solid '+c.bd+';color:'+c.fg+';'
       +'padding:12px 18px;border-radius:12px;font-family:-apple-system,sans-serif;'
-      +'font-size:13px;font-weight:600;backdrop-filter:blur(12px);'
+      +'font-size:13px;font-weight:600;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);'
       +'box-shadow:0 20px 40px -12px rgba(0,0,0,.55);z-index:2147483648;'
-      +'display:flex;align-items:center;gap:10px;min-width:220px;max-width:380px;';
+      +'display:flex;align-items:center;gap:10px;min-width:200px;max-width:calc(100vw - 32px);'
+      +'box-sizing:border-box;';
     el.innerHTML = '<span>'+c.icon+'</span><span>'+msg+'</span>';
     document.body.appendChild(el);
     toasts.push(el);
@@ -6343,11 +6628,6 @@ async def tool_ratelimit(req):
 # ======================================================================
 @app.post("/tool/ratelimit-stress")
 async def tool_ratelimit_stress(req):
-    """
-    Bounded concurrency probe. Finds where the target throttles.
-    Hard caps: total ≤ 500, concurrency ≤ 20, rps ≤ 50.
-    Honours Retry-After, aborts after N consecutive 429s.
-    """
     data = await req.form()
     fields = data["fields"] if isinstance(data, dict) and "fields" in data else data
     url = (fields.get("url") or "").strip()
