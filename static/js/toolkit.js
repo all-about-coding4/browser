@@ -1,6 +1,6 @@
 /* Lynkio toolkit — all tools (vulnerability scanner, agent, recon, osint,
    web, injection, http, cms, auth & cookies, enumeration, shell & takeover,
-   encode, payloads, customize). Mobile-first. */
+   encode, payloads, customize, captcha). Mobile-first. */
 (function(){
 "use strict";
 if (window.__LYNK_TOOLKIT__) return;
@@ -51,13 +51,11 @@ async function apiJ(p){
   try { return JSON.parse(t); } catch(e){ return { error: t || ('HTTP ' + r.status) }; }
 }
 async function post(p, d){
-  var fd = new FormData();
-  Object.keys(d||{}).forEach(function(k){
-    var v = d[k];
-    if (v === undefined || v === null) return;
-    fd.append(k, (typeof v === 'object') ? JSON.stringify(v) : String(v));
+  var r = await api(p, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(d || {}),
   });
-  var r = await api(p, {method:'POST', body: fd});
   var t = await r.text();
   try { return JSON.parse(t); } catch(e){ return { error: t || ('HTTP ' + r.status) }; }
 }
@@ -77,6 +75,7 @@ var CATEGORIES = [
   {id:'auth',      name:'🔐 Auth & Cookies'},
   {id:'enum',      name:'🔬 Enumeration'},
   {id:'shell',     name:'🐚 Shell & Takeover'},
+  {id:'captcha',   name:'🤖 Captcha'},
   {id:'encode',    name:'🔤 Encode'},
   {id:'payloads',  name:'📜 Payloads'},
   {id:'customize', name:'🎨 Customize'},
@@ -1356,6 +1355,41 @@ reg('shell', {id:'backup_scan', icon:'💾', name:'Backup / Config Hunter',
   }});
 
 /* ============================================================
+   CAPTCHA
+   ============================================================ */
+reg('captcha', {id:'captcha_detect', icon:'🤖', name:'Captcha Detector',
+  description:'Scan page for reCAPTCHA / hCaptcha / Turnstile / WAF challenges',
+  fields: [{name:'url', label:'URL', default:''}],
+  run: async function(i){
+    var d = await post('/tool/captcha-detect', {url: i.url || L.activeTabUrl()});
+    if (d.error) throw new Error(d.error);
+    if (!d.detected || !d.detected.length){
+      return { html: msg('ok','No captcha detected. HTML size: '+prettySize(d.html_size)),
+               raw: d };
+    }
+    return {
+      html: msg('warn', d.detected.length + ' captcha service(s) detected')
+        + d.detected.map(function(x){ return row('Detected', x); }).join('')
+        + msg('info','Use “Captcha Remover” below to hide overlays. '
+             + 'Note: server-side verification still blocks submission.'),
+      raw: d,
+    };
+  }});
+
+reg('captcha', {id:'captcha_remove', icon:'🧹', name:'Captcha Remover',
+  description:'Register a snippet that hides captcha widgets and unlocks scroll on every proxied page',
+  fields: [],
+  run: async function(){
+    var r = await post('/tool/captcha-remove', {});
+    if (!r.ok) throw new Error(r.reason || 'failed');
+    if (r.already){
+      return { html: msg('ok','Captcha Remover already active. Reload any proxied tab.'), raw: r };
+    }
+    return { html: msg('ok','Captcha Remover registered (snippet ' + r.id + '). '
+                          + 'Reload any proxied tab to activate.'), raw: r };
+  }});
+
+/* ============================================================
    ENCODE
    ============================================================ */
 reg('encode', {id:'hash', icon:'#️⃣', name:'Hash',
@@ -1487,15 +1521,71 @@ reg('payloads', {id:'payloads', icon:'📜', name:'Payload Library',
 /* ============================================================
    CUSTOMIZE
    ============================================================ */
+function wireInjectList(){
+  document.querySelectorAll('[data-inject-toggle]').forEach(function(b){
+    if (b.__wired) return; b.__wired = true;
+    b.onclick = async function(e){
+      e.stopPropagation();
+      await post('/tool/inject/toggle', {id: b.getAttribute('data-inject-toggle')});
+      UI.toast('Toggled', 'ok');
+      render();
+    };
+  });
+  document.querySelectorAll('[data-inject-delete]').forEach(function(b){
+    if (b.__wired) return; b.__wired = true;
+    b.onclick = async function(e){
+      e.stopPropagation();
+      if (!(await UI.confirm('Delete this snippet?'))) return;
+      await post('/tool/inject/delete', {id: b.getAttribute('data-inject-delete')});
+      UI.toast('Deleted', 'ok');
+      render();
+    };
+  });
+  document.querySelectorAll('[data-inject-view]').forEach(function(b){
+    if (b.__wired) return; b.__wired = true;
+    b.onclick = function(e){
+      e.stopPropagation();
+      var code = b.getAttribute('data-inject-view');
+      UI.modal({ title: 'Snippet source', width: 720 }).body.innerHTML =
+        '<pre class="result-pre">' + esc(code) + '</pre>';
+    };
+  });
+}
+
 reg('customize', {id:'inject', icon:'💉', name:'Inject JavaScript',
-  description:'Add a snippet to every proxied page', fields:[
-    {name:'name', label:'Name'},
+  description:'Manage per-session snippets injected into every proxied page',
+  fields: [
+    {name:'name', label:'Name', placeholder:'my snippet'},
     {name:'code', label:'Code', type:'textarea', placeholder:'console.log("hi");'}],
   run: async function(i){
-    if (!i.code || !i.code.trim()) throw new Error('code required');
-    var r = await post('/tool/inject/add', {name: i.name || 'unnamed', code: i.code});
-    if (!r.ok) throw new Error(r.reason || 'failed');
-    return { html: msg('ok','Snippet added — reload any tab.'), raw: r };
+    var added = '';
+    if (i.code && i.code.trim()){
+      var r = await post('/tool/inject/add', {name: i.name || 'unnamed', code: i.code});
+      if (!r.ok) throw new Error(r.reason || 'failed');
+      added = msg('ok','Snippet "' + (i.name || 'unnamed') + '" added. Reload any proxied tab.');
+    }
+    var list = await apiJ('/tool/inject/list-full');
+    var snippets = list.snippets || [];
+    var rendered = added;
+    if (!snippets.length){
+      rendered += msg('info','No snippets yet.');
+    } else {
+      rendered += msg('info', snippets.length + ' snippet(s) in this session');
+      rendered += snippets.map(function(s){
+        var dotColor = s.enabled ? '#10b981' : '#64748b';
+        return '<div class="result-list-item" style="flex-wrap:wrap;gap:6px;align-items:center;">'
+          + '<span style="color:'+dotColor+';font-size:14px;line-height:1;">●</span>'
+          + '<b style="min-width:0;flex:1;word-break:break-word;">'+esc(s.name)+'</b>'
+          + '<span style="color:#64748b;font-size:10.5px;">'+s.size+'B</span>'
+          + '<button class="btn small" data-inject-view="'+esc(s.code)+'">View</button>'
+          + '<button class="btn small" data-inject-toggle="'+esc(s.id)+'">'
+          + (s.enabled ? 'Disable' : 'Enable') + '</button>'
+          + '<button class="btn small" data-inject-delete="'+esc(s.id)+'">Delete</button>'
+          + '</div>';
+      }).join('');
+    }
+    setTimeout(wireInjectList, 0);
+    return { html: rendered, raw: list };
   }});
 
 reg('customize', {id:'console_test', icon:'▸_', name:'Console Test',

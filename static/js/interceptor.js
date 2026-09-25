@@ -1,6 +1,7 @@
 /* Lynkio interceptor — injected into every proxied page.
    Rewrites URLs at the property level, bridges console / errors / network
-   to the shell, tunnels WebSocket and EventSource through the proxy. */
+   to the shell, tunnels WebSocket and EventSource through the proxy.
+   Never touches captcha / challenge hosts (they verify origin). */
 (function(){
 if (window.__LYNK_ICPT__) return;
 window.__LYNK_ICPT__ = true;
@@ -14,7 +15,30 @@ var ORIGIN = location.origin;
 var PROXY  = ORIGIN + '/proxy';
 var WS_TUN = ORIGIN.replace(/^http/, 'ws') + '/__lynk_ws';
 
-/* ---------------- signaling ---------------- */
+var CAPTCHA_HOSTS = [
+  'google.com/recaptcha/',
+  'recaptcha.net/recaptcha/',
+  'gstatic.com/recaptcha/',
+  'hcaptcha.com/',
+  'newassets.hcaptcha.com/',
+  'challenges.cloudflare.com/',
+  'turnstile.com/',
+  'cloudflare.com/cdn-cgi/challenge-platform/',
+  'arkoselabs.com/',
+  'funcaptcha.com/',
+  'captcha.awswaf.com/',
+  'awswaf.com/captcha/',
+];
+function isCaptchaURL(u){
+  try {
+    var s = String(u).toLowerCase();
+    for (var i = 0; i < CAPTCHA_HOSTS.length; i++){
+      if (s.indexOf(CAPTCHA_HOSTS[i]) !== -1) return true;
+    }
+  } catch(e){}
+  return false;
+}
+
 function post(type, payload){
   try {
     if (!window.parent || window.parent === window) return;
@@ -39,7 +63,6 @@ document.addEventListener('click', function(e){
 }, true);
 document.addEventListener('submit', function(){ post('nav-start'); }, true);
 
-/* ---------------- console bridge ---------------- */
 ['log','info','warn','error','debug'].forEach(function(level){
   var orig = console[level];
   if (!orig) return;
@@ -72,7 +95,6 @@ window.addEventListener('unhandledrejection', function(e){
   });
 });
 
-/* ---------------- URL rewriting ---------------- */
 function isLocal(s){
   if (!s) return false;
   if (s.indexOf(ORIGIN) === 0){
@@ -96,6 +118,7 @@ function rw(u){
     if (s.charAt(0) === '#') return u;
     if (/^(data|blob|javascript|about|mailto|tel|chrome|chrome-extension|file|ws:|wss:)/i.test(s)) return u;
     if (s.length > 16384) return u;
+    if (isCaptchaURL(s)) return s;
     if (isLocal(s)) return u;
     if (s.indexOf('//') === 0) return PROXY + '?url=' + encodeURIComponent(UP.protocol + s);
     if (/^https?:\/\//i.test(s)) return PROXY + '?url=' + encodeURIComponent(s);
@@ -105,11 +128,13 @@ function rw(u){
       if (rest === '/' || rest === '') return u;
       try {
         var u2 = new URL(rest, UP.href);
+        if (isCaptchaURL(u2.href)) return u2.href;
         return PROXY + '?url=' + encodeURIComponent(u2.href);
       } catch(e){ return u; }
     }
     try {
       var abs = new URL(s, UP.href);
+      if (isCaptchaURL(abs.href)) return abs.href;
       if (abs.protocol === 'http:' || abs.protocol === 'https:')
         return PROXY + '?url=' + encodeURIComponent(abs.href);
     } catch(e){}
@@ -130,18 +155,27 @@ function rwSrcset(s){
   } catch(e){ return s; }
 }
 
-/* ---------------- fetch / XHR ---------------- */
+/* ---------- fetch / XHR ----------
+   IMPORTANT: do not attempt to clone Requests that have a stream body —
+   `new Request(url, originalRequest)` throws "ReadableStream uploading is
+   not supported" in Chrome.  Only rewrite the URL for requests without a
+   body, or for string/URL inputs. */
 var _fetch = window.fetch;
 if (_fetch){
   window.fetch = function(input, init){
     var urlForLog;
     try { urlForLog = typeof input === 'string' ? input : (input && input.url); } catch(e){}
     try {
-      if (typeof input === 'string') input = rw(input);
-      else if (input instanceof URL) input = rw(input.href);
-      else if (input instanceof Request){
-        var nu = rw(input.url);
-        if (nu !== input.url) input = new Request(nu, input);
+      if (typeof input === 'string'){
+        input = rw(input);
+      } else if (input instanceof URL){
+        input = rw(input.href);
+      } else if (input instanceof Request){
+        // Only safe to rewrap when the body is null (GET/HEAD or empty POST).
+        if (input.body === null){
+          var nu = rw(input.url);
+          if (nu !== input.url) input = new Request(nu, input);
+        }
       }
     } catch(e){}
     var p = _fetch.apply(this, arguments);
@@ -177,7 +211,6 @@ XMLHttpRequest.prototype.open = function(m, u){
   return _xhrOpen.apply(this, arguments);
 };
 
-/* ---------------- WebSocket relay ---------------- */
 var _WS = window.WebSocket;
 window.WebSocket = function(url, protocols){
   try {
@@ -196,7 +229,6 @@ window.WebSocket.prototype = _WS.prototype;
   window.WebSocket[k] = _WS[k];
 });
 
-/* ---------------- EventSource relay ---------------- */
 var _ES = window.EventSource;
 if (_ES){
   window.EventSource = function(url, opts){
@@ -206,7 +238,6 @@ if (_ES){
   window.EventSource.prototype = _ES.prototype;
 }
 
-/* ---------------- sendBeacon ---------------- */
 if (navigator.sendBeacon){
   var _sb = navigator.sendBeacon.bind(navigator);
   navigator.sendBeacon = function(u, d){
@@ -215,7 +246,6 @@ if (navigator.sendBeacon){
   };
 }
 
-/* ---------------- property hooks ---------------- */
 function hook(proto, prop, xform){
   if (!proto) return;
   try {
@@ -247,7 +277,6 @@ hook(window.HTMLTrackElement   && HTMLTrackElement.prototype,   'src',    rw);
 hook(window.HTMLObjectElement  && HTMLObjectElement.prototype,  'data',   rw);
 hook(window.HTMLFormElement    && HTMLFormElement.prototype,    'action', rw);
 
-/* ---------------- setAttribute ---------------- */
 var ATTRS = {
   SCRIPT:['src'], IMG:['src','srcset'], IFRAME:['src'], EMBED:['src'],
   SOURCE:['src','srcset'], VIDEO:['src','poster'], AUDIO:['src'],
@@ -266,7 +295,6 @@ Element.prototype.setAttribute = function(name, value){
   return _setAttr.call(this, name, value);
 };
 
-/* ---------------- DOM mutation safety net ---------------- */
 function fixNode(node){
   try {
     if (!node || node.nodeType !== 1) return;
@@ -289,7 +317,6 @@ Node.prototype.appendChild = function(c){ try { fixNode(c); } catch(e){} return 
 var _ib = Node.prototype.insertBefore;
 Node.prototype.insertBefore = function(c, r){ try { fixNode(c); } catch(e){} return _ib.call(this, c, r); };
 
-/* ---------------- fragment rewriting ---------------- */
 function rewriteFragment(html){
   if (!html || typeof html !== 'string' || html.length > 500000) return html;
   try {
@@ -342,7 +369,6 @@ try {
   };
 } catch(e){}
 
-/* ---------------- createElement hook ---------------- */
 try {
   var _create = Document.prototype.createElement;
   Document.prototype.createElement = function(tag, opts){
@@ -358,7 +384,6 @@ try {
   };
 } catch(e){}
 
-/* ---------------- MutationObserver safety net ---------------- */
 try {
   var _obs = new MutationObserver(function(muts){
     for (var i = 0; i < muts.length; i++){
@@ -386,7 +411,6 @@ try {
   });
 } catch(e){}
 
-/* ---------------- SPA routing + window.open ---------------- */
 try {
   var _ps = history.pushState;
   history.pushState = function(s, t, url){

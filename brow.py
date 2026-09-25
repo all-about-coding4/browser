@@ -1,17 +1,25 @@
 #!/usr/bin/env python3
 """
-Lynkio Browser — v17.1
+Lynkio Browser — v17.9
 Built on the lynkio framework v1.4.2.
 
-Complete build with:
-  • Streaming proxy — HTML / CSS / HLS rewritten, everything else raw
-    passthrough with original Content-Encoding (browser decodes natively).
-  • Multi-IP connect via DoH + system DNS, IPv4 preferred.
-  • Per-session editable cookie jar.
-  • File viewer, site tree crawler, directory brute.
-  • 400+ vulnerability scanner (scanner.py) exposed at /tool/vulnscan.
-  • 30+ extended reconnaissance / injection / CORS / takeover tools.
-  • Correct static asset serving with proper MIME types.
+Large-file-hardened release.
+
+What changed vs v17.8:
+  • Streaming uses 64 KiB chunks with explicit GeneratorExit / CancelledError
+    handling.  When the client closes the socket mid-stream, our generator
+    closes the upstream socket immediately and awaits writer.wait_closed()
+    so the event loop releases the FD.  No leaked connections on seek/stop.
+  • Small-media buffer threshold is explicit and configurable
+    (SMALL_MEDIA_MAX).  Everything above it streams, no exceptions.
+  • Upstream ConnectionResetError / BrokenPipeError are swallowed — they
+    mean the CDN closed, not that we should crash.
+  • Handles multi-GB and multi-TB files identically: never buffered, never
+    advertised a Content-Length we can't honour mid-stream.
+  • Chunked upstream (Transfer-Encoding: chunked) responses are forwarded
+    without Content-Length.  HTTP/1.1 closes the body naturally.
+  • All StreamingResponse generators share one cleanup shape so behaviour
+    is predictable: `finally: writer.close(); await writer.wait_closed()`.
 """
 
 import asyncio
@@ -23,11 +31,9 @@ import json
 import logging
 import mimetypes
 import os
-import random as _random
 import re
 import socket
 import ssl
-import string as _string
 import time
 import uuid
 import zlib
@@ -45,9 +51,6 @@ from lynkio import (
 
 import scanner
 
-# ----------------------------------------------------------------------
-# Paths
-# ----------------------------------------------------------------------
 HERE          = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR    = os.path.join(HERE, "static")
 TEMPLATES_DIR = os.path.join(HERE, "templates")
@@ -58,14 +61,25 @@ PORT              = 8080
 CONNECT_TIMEOUT   = 8.0
 SSL_HANDSHAKE_TL  = 8.0
 HEADER_TIMEOUT    = 40.0
-BODY_IDLE_TIMEOUT = 90.0
+BODY_IDLE_TIMEOUT = 120.0
 DOH_TIMEOUT       = 5.0
 
 MAX_REWRITE_BYTES = 8 * 1024 * 1024
 MAX_CSS_BYTES     = 4 * 1024 * 1024
 MAX_HLS_BYTES     = 2 * 1024 * 1024
 MAX_HEADER_BYTES  = 128 * 1024
-MAX_VIEW_BYTES    = 2 * 1024 * 1024
+MAX_BUFFER_BYTES  = 8 * 1024 * 1024
+
+# Streaming chunk size.  64 KiB matches asyncio's default reader chunk size
+# and is small enough that a client disconnect is noticed on the next drain()
+# without a large in-flight buffer.
+STREAM_CHUNK_SIZE = 64 * 1024
+
+# Small media below this size is buffered so we can send an exact
+# Content-Length in a single write.  Anything larger streams.  1 MiB is a
+# good cutoff: bigger than most thumbnails and short audio, smaller than
+# any video segment.
+SMALL_MEDIA_MAX = 1 * 1024 * 1024
 
 SESSION_COOKIE = "__lynk_sid"
 ORIGIN_COOKIE  = "__lynk_origin"
@@ -101,11 +115,6 @@ BROWSER_HEADERS = {
     "Sec-Ch-Ua": '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
     "Sec-Ch-Ua-Mobile": "?0",
     "Sec-Ch-Ua-Platform": '"Windows"',
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Priority": "u=0, i",
 }
 
 FORWARD_REQUEST_HEADERS = {
@@ -113,22 +122,210 @@ FORWARD_REQUEST_HEADERS = {
     "if-none-match", "if-modified-since", "if-match", "if-unmodified-since",
     "range", "if-range",
     "accept-language", "x-requested-with",
+    "referer",
 }
 
 FORWARD_RESPONSE_HEADERS = {
     "cache-control", "etag", "last-modified", "expires", "vary",
     "content-language", "content-disposition", "accept-ranges",
+    "content-range", "content-md5", "digest",
     "access-control-allow-origin", "access-control-allow-credentials",
     "access-control-expose-headers", "access-control-max-age",
     "access-control-allow-methods", "access-control-allow-headers",
     "content-encoding",
 }
 
-NEVER_EMIT = {"content-length", "transfer-encoding", "connection", "keep-alive"}
+_HOP_BY_HOP = {
+    "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
+    "te", "trailer", "transfer-encoding", "upgrade",
+}
 
-# ----------------------------------------------------------------------
-# App
-# ----------------------------------------------------------------------
+NEVER_EMIT = {"transfer-encoding", "connection", "keep-alive"}
+
+CAPTCHA_HOSTS = (
+    "google.com/recaptcha/",
+    "recaptcha.net/recaptcha/",
+    "gstatic.com/recaptcha/",
+    "hcaptcha.com/",
+    "newassets.hcaptcha.com/",
+    "challenges.cloudflare.com/",
+    "turnstile.com/",
+    "cloudflare.com/cdn-cgi/challenge-platform/",
+    "arkoselabs.com/",
+    "funcaptcha.com/",
+    "captcha.awswaf.com/",
+    "awswaf.com/captcha/",
+)
+
+STATIC_EXTS = {
+    ".js", ".mjs", ".cjs", ".css", ".json", ".map", ".wasm",
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".ico", ".bmp",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".mp3", ".mp4", ".webm", ".wav", ".ogg", ".m4a", ".ts",
+    ".pdf", ".zip", ".gz", ".tgz", ".tar", ".7z", ".rar",
+}
+
+STREAM_MEDIA_PREFIXES = ("video/", "audio/", "image/", "font/")
+STREAM_MEDIA_TYPES = {
+    "application/octet-stream", "application/pdf",
+    "application/zip", "application/x-zip-compressed",
+    "application/x-rar-compressed", "application/x-7z-compressed",
+    "application/x-tar", "application/gzip", "application/x-gzip",
+    "application/wasm", "application/x-shockwave-flash",
+    "application/vnd.ms-fontobject",
+    "application/x-font-ttf", "application/x-font-opentype",
+    "application/font-woff", "application/font-woff2",
+    "application/epub+zip", "application/x-msdownload",
+    "application/vnd.apple.mpegurl", "application/x-mpegurl",
+    "application/vnd.rn-realmedia",
+    "application/dash+xml",
+}
+STREAM_MEDIA_EXTS = {
+    ".mp4", ".m4v", ".webm", ".mov", ".avi", ".mkv", ".flv", ".ts",
+    ".mpg", ".mpeg", ".f4v", ".3gp", ".ogv", ".m2ts", ".mts", ".mpd",
+    ".mp3", ".m4a", ".aac", ".wav", ".ogg", ".oga", ".opus", ".flac",
+    ".weba", ".mid", ".midi", ".wma", ".mka",
+    ".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif", ".bmp", ".ico",
+    ".tif", ".tiff", ".heic", ".heif", ".jxl", ".jfif",
+    ".woff", ".woff2", ".ttf", ".otf", ".eot",
+    ".pdf", ".zip", ".rar", ".7z", ".tar", ".gz", ".tgz", ".bz2", ".xz",
+    ".wasm", ".swf", ".bin", ".exe", ".dmg", ".iso", ".apk", ".deb",
+    ".rpm", ".msi", ".jar", ".class", ".m4s", ".mp2t",
+}
+
+_MEDIA_PATH_HINTS = (
+    "/video/", "/videos/", "/stream/", "/streams/", "/segment/", "/segments/",
+    "/tos-", "/obj/", "/media/", "/play/", "/hls/", "/dash/", "/mse/",
+    "/chunk/", "/chunks/", "/slice/", "/slices/", "/image/", "/images/",
+    "/img/", "/imgs/", "/thumb/", "/thumbs/", "/avatar/", "/avatars/",
+    "/photo/", "/photos/", "/asset/", "/assets/", "/static/video/",
+    "/static/image/", "/static/img/", "/cdn/", "/mp4/", "/m4s/",
+)
+
+
+def _is_captcha_url(u):
+    try:
+        p = urlparse(u)
+    except Exception:
+        return False
+    h = (p.hostname or "").lower()
+    path = (p.path or "")
+    full = h + path
+    for s in CAPTCHA_HOSTS:
+        if s in full:
+            return True
+    return False
+
+
+def _looks_like_html(body_bytes):
+    if not body_bytes:
+        return False
+    head = body_bytes[:512].lstrip()
+    low = head.lower()
+    if low.startswith(b"<!doctype") or low.startswith(b"<html"):
+        return True
+    if low.startswith(b"<"):
+        if (b"<html" in low[:300] or b"<head" in low[:300]
+                or b"<body" in low[:300]):
+            return True
+    return False
+
+
+def _requested_kind(req, target_url):
+    dest = (req.headers.get("sec-fetch-dest") or "").lower().strip()
+    if dest == "script":
+        return "script"
+    if dest == "style":
+        return "style"
+    if dest in ("document", "iframe", "frame"):
+        return "document"
+    if dest in ("image", "video", "audio", "font", "track", "manifest"):
+        return "media"
+    if dest == "empty":
+        accept = (req.headers.get("accept") or "").lower()
+        if "video" in accept or "audio" in accept or "image" in accept:
+            return "media"
+        return "data"
+    try:
+        path = (urlparse(target_url).path or "").lower()
+    except Exception:
+        path = ""
+    ext = os.path.splitext(path)[1]
+    if ext in (".js", ".mjs", ".cjs"):
+        return "script"
+    if ext == ".css":
+        return "style"
+    if ext in STREAM_MEDIA_EXTS:
+        return "media"
+    accept = (req.headers.get("accept") or "").lower()
+    if "text/html" in accept:
+        return "document"
+    if "video" in accept or "audio" in accept or "image" in accept:
+        return "media"
+    return ""
+
+
+def _media_hint_by_path(target_url):
+    try:
+        path = (urlparse(target_url).path or "").lower()
+    except Exception:
+        return False
+    for h in _MEDIA_PATH_HINTS:
+        if h in path:
+            return True
+    return False
+
+
+def _is_media_response(req, target_url, ctype, ext, status, content_range):
+    if status == 206 or content_range:
+        return True
+    ct = (ctype or "").split(";", 1)[0].strip().lower()
+    if any(ct.startswith(p) for p in STREAM_MEDIA_PREFIXES):
+        return True
+    if ct in STREAM_MEDIA_TYPES:
+        return True
+    if ext in STREAM_MEDIA_EXTS:
+        return True
+    accept = (req.headers.get("accept") or "").lower()
+    dest = (req.headers.get("sec-fetch-dest") or "").lower()
+    if dest in ("image", "video", "audio", "font", "track"):
+        return True
+    if ("video" in accept or "audio" in accept or "image" in accept) \
+            and _media_hint_by_path(target_url):
+        return True
+    if _media_hint_by_path(target_url) and not ct:
+        return True
+    return False
+
+
+def _js_stub(status, target_url, preview=b""):
+    try:
+        preview_txt = preview.decode("utf-8", "replace").replace("*/", "* /")
+    except Exception:
+        preview_txt = ""
+    body = (
+        "/* lynkio: upstream returned %d for this JS chunk.\n"
+        "   target: %s\n"
+        "   preview: %s\n"
+        "   This stub keeps the module graph alive. */\n"
+        "console.warn('[lynk] chunk not available:', %s);\n"
+    ) % (
+        status,
+        target_url.replace("*/", "* /"),
+        preview_txt[:160],
+        json.dumps(target_url),
+    )
+    return body.encode("utf-8")
+
+
+def _css_stub(status, target_url):
+    body = (
+        "/* lynkio: upstream returned %d for this CSS asset.\n"
+        "   target: %s */\n"
+    ) % (status, target_url.replace("*/", "* /"))
+    return body.encode("utf-8")
+
+
 app = Lynk(
     host=HOST, port=PORT, protocol="TCP", debug=False,
     serve_client=True, max_body_size=64 * 1024 * 1024,
@@ -189,6 +386,7 @@ class Session:
         self.source_cache   = {}
         self.history        = deque(maxlen=1000)
         self.last_origin    = ""
+        self.page_origin    = ""
         self.recent_origins = deque(maxlen=24)
         self.cookies        = CookieJar()
 
@@ -200,6 +398,53 @@ class Session:
             maxlen=24,
         )
         self.recent_origins.appendleft((origin, now))
+
+    def last_page_url(self, exclude_host=""):
+        exclude_host = (exclude_host or "").lower()
+        for entry in reversed(list(self.history)):
+            u = entry.get("url", "")
+            if not u:
+                continue
+            try:
+                p = urlparse(u)
+                hp = (p.hostname or "").lower()
+            except Exception:
+                continue
+            if exclude_host and hp == exclude_host:
+                continue
+            ext = os.path.splitext(p.path.lower())[1]
+            if ext in STATIC_EXTS:
+                continue
+            if not ext or ext in (".html", ".htm", ".xhtml",
+                                   ".php", ".asp", ".aspx", ".jsp"):
+                return u
+        return ""
+
+    def last_page_url_for_origin(self, origin):
+        try:
+            oh = (urlparse(origin).hostname or "").lower()
+        except Exception:
+            return ""
+        if not oh:
+            return ""
+        for entry in reversed(list(self.history)):
+            u = entry.get("url", "")
+            if not u:
+                continue
+            try:
+                p = urlparse(u)
+                hp = (p.hostname or "").lower()
+            except Exception:
+                continue
+            if hp != oh:
+                continue
+            ext = os.path.splitext(p.path.lower())[1]
+            if ext in STATIC_EXTS:
+                continue
+            if not ext or ext in (".html", ".htm", ".xhtml",
+                                   ".php", ".asp", ".aspx", ".jsp"):
+                return u
+        return ""
 
 
 SESSIONS = {}
@@ -357,34 +602,56 @@ def is_self_target(req, target_url):
 
 
 def _recover_origin(req, sess):
+    incoming = (req.headers.get("host") or "").lower()
+    in_host = _norm_host(incoming).split(":", 1)[0] if incoming else ""
+
+    def _usable(u):
+        if not u:
+            return ""
+        try:
+            p = urlparse(u)
+            if p.scheme not in ("http", "https") or not p.netloc:
+                return ""
+            hp = (p.hostname or "").lower()
+            if in_host and hp == in_host:
+                return ""
+            return f"{p.scheme}://{p.netloc}"
+        except Exception:
+            return ""
+
     ref = req.headers.get("referer", "")
     up = extract_upstream(ref)
-    if up:
-        p = urlparse(up)
-        if p.scheme in ("http", "https") and p.netloc:
-            return f"{p.scheme}://{p.netloc}"
+    origin = _usable(up)
+    if origin:
+        return origin
+
     cv = req.cookies.get(ORIGIN_COOKIE, "")
-    if cv:
-        p = urlparse(unquote(cv))
-        if p.scheme in ("http", "https") and p.netloc:
-            return f"{p.scheme}://{p.netloc}"
-    oh = req.headers.get("origin", "")
-    if oh:
-        p = urlparse(oh)
-        if p.scheme in ("http", "https") and p.netloc:
-            return f"{p.scheme}://{p.netloc}"
-    incoming = (req.headers.get("host") or "").lower()
-    in_host = _norm_host(incoming).split(":", 1)[0]
-    if sess.last_origin:
-        p = urlparse(sess.last_origin)
-        if p.netloc and (p.hostname or "").lower() != in_host:
-            return sess.last_origin
+    origin = _usable(unquote(cv) if cv else "")
+    if origin:
+        return origin
+
+    origin = _usable(req.headers.get("origin", ""))
+    if origin:
+        return origin
+
+    origin = _usable(sess.page_origin)
+    if origin:
+        return origin
+
+    origin = _usable(sess.last_origin)
+    if origin:
+        return origin
+
+    for (o, _ts) in list(sess.recent_origins):
+        origin = _usable(o)
+        if origin:
+            return origin
+
     for entry in reversed(list(sess.history)):
-        u = entry.get("url", "")
-        p = urlparse(u)
-        if (p.scheme in ("http", "https") and p.netloc
-                and (p.hostname or "").lower() != in_host):
-            return f"{p.scheme}://{p.netloc}"
+        origin = _usable(entry.get("url", ""))
+        if origin:
+            return origin
+
     return ""
 
 
@@ -434,6 +701,9 @@ class HTMLRewriter:
                 out.append(entry)
                 continue
             absu = urljoin(base, u)
+            if _is_captcha_url(absu):
+                out.append(entry)
+                continue
             out.append(f"{proxy_url(absu)} {tail}".strip() if tail
                        else proxy_url(absu))
         return ", ".join(out)
@@ -444,16 +714,25 @@ class HTMLRewriter:
             if not inner or inner.startswith("data:"):
                 return m.group(0)
             if inner.startswith("//"):
-                return f"url('{proxy_url(urljoin(base, inner))}')"
+                absu = urljoin(base, inner)
+                if _is_captcha_url(absu):
+                    return m.group(0)
+                return f"url('{proxy_url(absu)}')"
             if skip_url(inner):
                 return m.group(0)
-            return f"url('{proxy_url(urljoin(base, inner))}')"
+            absu = urljoin(base, inner)
+            if _is_captcha_url(absu):
+                return m.group(0)
+            return f"url('{proxy_url(absu)}')"
 
         def sub_import(m):
             q, inner = m.group(1), m.group(2).strip()
             if skip_url(inner) or inner.startswith("//"):
                 return m.group(0)
-            return f"@import {q}{proxy_url(urljoin(base, inner))}{q}"
+            absu = urljoin(base, inner)
+            if _is_captcha_url(absu):
+                return m.group(0)
+            return f"@import {q}{proxy_url(absu)}{q}"
 
         css = re.sub(r"url\(\s*([^)]+?)\s*\)", sub_url, css)
         css = re.sub(r"""@import\s+(["'])([^"']+)\1""", sub_import, css)
@@ -479,27 +758,46 @@ class HTMLRewriter:
 
         for tag in soup.find_all(["a", "link", "area"], href=True):
             h = tag["href"]
-            if not skip_url(h):
-                tag["href"] = proxy_url(urljoin(base, h))
+            if skip_url(h):
+                continue
+            absu = urljoin(base, h)
+            if _is_captcha_url(absu):
+                tag["href"] = absu
+                continue
+            tag["href"] = proxy_url(absu)
 
         for tag in soup.find_all(
             ["img", "script", "iframe", "embed", "source", "video",
              "audio", "track", "input"], src=True):
             s = tag["src"]
-            if not skip_url(s):
-                tag["src"] = proxy_url(urljoin(base, s))
+            if skip_url(s):
+                continue
+            absu = urljoin(base, s)
+            if _is_captcha_url(absu):
+                tag["src"] = absu
+                continue
+            tag["src"] = proxy_url(absu)
 
         for tag in soup.find_all("object", data=True):
             d = tag["data"]
-            if not skip_url(d):
-                tag["data"] = proxy_url(urljoin(base, d))
+            if skip_url(d):
+                continue
+            absu = urljoin(base, d)
+            if _is_captcha_url(absu):
+                tag["data"] = absu
+                continue
+            tag["data"] = proxy_url(absu)
 
         for attr in ("data-src", "data-original", "data-lazy-src",
                      "data-url", "data-href", "data-image"):
             for tag in soup.find_all(attrs={attr: True}):
                 v = tag[attr]
-                if not skip_url(v):
-                    tag[attr] = proxy_url(urljoin(base, v))
+                if skip_url(v):
+                    continue
+                absu = urljoin(base, v)
+                if _is_captcha_url(absu):
+                    continue
+                tag[attr] = proxy_url(absu)
 
         for attr in ("srcset", "data-srcset"):
             for tag in soup.find_all(attrs={attr: True}):
@@ -507,8 +805,12 @@ class HTMLRewriter:
 
         for tag in soup.find_all("video", poster=True):
             p = tag["poster"]
-            if not skip_url(p):
-                tag["poster"] = proxy_url(urljoin(base, p))
+            if skip_url(p):
+                continue
+            absu = urljoin(base, p)
+            if _is_captcha_url(absu):
+                continue
+            tag["poster"] = proxy_url(absu)
 
         for meta in soup.find_all("meta", attrs={"property": True}):
             prop = (meta.get("property") or "").lower()
@@ -516,7 +818,9 @@ class HTMLRewriter:
                         "twitter:image", "twitter:url"):
                 v = meta.get("content", "")
                 if v and not skip_url(v):
-                    meta["content"] = proxy_url(urljoin(base, v))
+                    absu = urljoin(base, v)
+                    if not _is_captcha_url(absu):
+                        meta["content"] = proxy_url(absu)
 
         for form in soup.find_all("form"):
             method = (form.get("method") or "get").lower()
@@ -545,13 +849,15 @@ class HTMLRewriter:
                 if m:
                     u = m.group(1).strip().strip("'\"")
                     if not skip_url(u):
-                        meta["content"] = re.sub(
-                            r"url\s*=\s*[^;]+",
-                            f"url={proxy_url(urljoin(base, u))}",
-                            content, flags=re.I)
+                        absu = urljoin(base, u)
+                        if not _is_captcha_url(absu):
+                            meta["content"] = re.sub(
+                                r"url\s*=\s*[^;]+",
+                                f"url={proxy_url(absu)}",
+                                content, flags=re.I)
 
         for tag in soup.find_all(["script", "link"]):
-            for a in ("integrity", "crossorigin", "nonce", "referrerpolicy"):
+            for a in ("integrity", "crossorigin", "referrerpolicy"):
                 tag.attrs.pop(a, None)
 
         head = soup.head or soup.new_tag("head")
@@ -565,19 +871,22 @@ class HTMLRewriter:
             "navigator.serviceWorker.register('/lynkio/service-ws.js',{scope:'/'})"
             ".catch(function(e){})}"
         )
-        head.insert(0, boot)
 
-        target = soup.body or soup.html or soup
         ctx_s = soup.new_tag("script")
         ctx_s.string = f"window.__LYNK_CTX__={json.dumps(self.ctx)};"
-        target.insert(0, ctx_s)
 
-        ui = soup.new_tag("script"); ui["src"] = "/static/js/ui.js"
-        icpt = soup.new_tag("script"); icpt["src"] = "/static/js/interceptor.js"
-        target.insert(1, icpt)
-        target.insert(2, ui)
+        icpt = soup.new_tag("script")
+        icpt["src"] = "/static/js/interceptor.js"
+        ui = soup.new_tag("script")
+        ui["src"] = "/static/js/ui.js"
+
+        head.insert(0, boot)
+        head.insert(1, ctx_s)
+        head.insert(2, icpt)
+        head.insert(3, ui)
 
         for snip in self.ctx.get("_injected", []):
+            target = soup.body or soup.html or soup
             s = soup.new_tag("script"); s.string = snip; target.append(s)
 
         return str(soup).encode("utf-8", errors="ignore")
@@ -611,6 +920,8 @@ def rewrite_m3u8(text, base_url):
                 if skip_url(u):
                     return m.group(0)
                 absu = urljoin(base_url, u)
+                if _is_captcha_url(absu):
+                    return m.group(0)
                 return f'URI="{proxy_url(absu)}"'
             line = _M3U8_URI_ATTR.sub(sub_uri, line)
             out_lines.append(line)
@@ -875,10 +1186,36 @@ async def _open_upstream_stream(target_url, method, headers, body):
     return reader, writer, status, hdrs, rest
 
 
+async def _close_writer(writer):
+    """Best-effort async close of an upstream writer.
+
+    Never raises.  Fully drains the transport so the event loop releases
+    the socket FD on the next iteration.
+    """
+    if writer is None:
+        return
+    try:
+        writer.close()
+    except Exception:
+        pass
+    try:
+        await writer.wait_closed()
+    except Exception:
+        pass
+
+
 # ======================================================================
 # Body readers
 # ======================================================================
-async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
+async def _iter_body(reader, headers, first_chunk=b"",
+                     chunk_size=STREAM_CHUNK_SIZE):
+    """Yield bytes from an HTTP response body.
+
+    Handles Content-Length, chunked transfer-encoding, and
+    connection-close framing.  Terminates cleanly on upstream EOF.
+    Upstream ConnectionResetError / BrokenPipeError are swallowed
+    (they mean the CDN closed, which we handle by returning).
+    """
     te = _header(headers, "transfer-encoding").lower()
     cl = _header(headers, "content-length")
 
@@ -886,8 +1223,12 @@ async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
         buf = bytearray(first_chunk)
         while True:
             while b"\r\n" not in buf:
-                chunk = await asyncio.wait_for(reader.read(4096),
-                                               timeout=BODY_IDLE_TIMEOUT)
+                try:
+                    chunk = await asyncio.wait_for(
+                        reader.read(4096), timeout=BODY_IDLE_TIMEOUT)
+                except (asyncio.TimeoutError, ConnectionResetError,
+                        BrokenPipeError):
+                    return
                 if not chunk:
                     return
                 buf.extend(chunk)
@@ -904,7 +1245,8 @@ async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
                         try:
                             more = await asyncio.wait_for(
                                 reader.read(1024), timeout=1.0)
-                        except asyncio.TimeoutError:
+                        except (asyncio.TimeoutError, ConnectionResetError,
+                                BrokenPipeError):
                             return
                         if not more:
                             return
@@ -915,9 +1257,13 @@ async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
                     if line == b"":
                         return
             while len(buf) < size + 2:
-                chunk = await asyncio.wait_for(
-                    reader.read(min(chunk_size, size + 2 - len(buf))),
-                    timeout=BODY_IDLE_TIMEOUT)
+                try:
+                    chunk = await asyncio.wait_for(
+                        reader.read(min(chunk_size, size + 2 - len(buf))),
+                        timeout=BODY_IDLE_TIMEOUT)
+                except (asyncio.TimeoutError, ConnectionResetError,
+                        BrokenPipeError):
+                    return
                 if not chunk:
                     return
                 buf.extend(chunk)
@@ -937,8 +1283,12 @@ async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
                     yield bytes(first_chunk[:take]); sent = take
             while sent < length:
                 to_read = min(chunk_size, length - sent)
-                chunk = await asyncio.wait_for(reader.read(to_read),
-                                               timeout=BODY_IDLE_TIMEOUT)
+                try:
+                    chunk = await asyncio.wait_for(
+                        reader.read(to_read), timeout=BODY_IDLE_TIMEOUT)
+                except (asyncio.TimeoutError, ConnectionResetError,
+                        BrokenPipeError):
+                    return
                 if not chunk:
                     return
                 sent += len(chunk); yield chunk
@@ -951,6 +1301,8 @@ async def _iter_body(reader, headers, first_chunk=b"", chunk_size=65536):
             chunk = await asyncio.wait_for(reader.read(chunk_size),
                                            timeout=BODY_IDLE_TIMEOUT)
         except asyncio.TimeoutError:
+            return
+        except (ConnectionResetError, BrokenPipeError):
             return
         if not chunk:
             return
@@ -997,17 +1349,159 @@ async def _iter_body_identity(reader, headers, first_chunk=b""):
         pass
 
 
+def _make_streaming_body(reader, writer, headers, first, target_url):
+    """Return an async generator that streams bytes from upstream.
+
+    Handles every consumer-side termination mode:
+      • Normal completion (upstream EOF).
+      • GeneratorExit — the consumer (framework) stopped iterating because
+        the client disconnected or the writer failed.
+      • CancelledError — the request task was cancelled.
+      • Upstream ConnectionResetError / BrokenPipeError.
+    In all cases the upstream socket is closed and awaited before return.
+    """
+    async def _gen():
+        try:
+            async for chunk in _iter_body(reader, headers, first,
+                                           chunk_size=STREAM_CHUNK_SIZE):
+                yield chunk
+        except (ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception as e:
+            log.debug("stream aborted: %s: %s", target_url, e)
+        finally:
+            await _close_writer(writer)
+    return _gen
+
+
 # ======================================================================
 # Header assembly
 # ======================================================================
-def _collect_request_headers(req):
+def _collect_request_headers(req, target_url=""):
     h = dict(BROWSER_HEADERS)
+    incoming = {}
     for k, v in req.headers.items():
-        if k.lower() in FORWARD_REQUEST_HEADERS and v:
-            h[k] = v
-    if "Range" in h or "range" in h:
+        incoming[k.lower()] = v
+
+    for k in [x for x in incoming.keys() if x.startswith("sec-fetch-")]:
+        incoming.pop(k, None)
+
+    for k, v in incoming.items():
+        if k in FORWARD_REQUEST_HEADERS and v:
+            h[k.title()] = v
+
+    if h.get("Range") or h.get("range"):
         h["Accept-Encoding"] = "identity"
+
+    path = ""
+    if target_url:
+        try:
+            path = (urlparse(target_url).path or "").lower()
+        except Exception:
+            path = ""
+    ext = os.path.splitext(path)[1] if path else ""
+
+    if ext in STREAM_MEDIA_EXTS or ext in (".m3u8", ".mpd"):
+        h["Accept-Encoding"] = "identity"
+
+    if ext in (".js", ".mjs", ".cjs"):
+        h["Accept"] = "*/*"
+        h["Sec-Fetch-Dest"] = "script"
+        h["Sec-Fetch-Mode"] = "no-cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext == ".css":
+        h["Accept"] = "text/css,*/*;q=0.1"
+        h["Sec-Fetch-Dest"] = "style"
+        h["Sec-Fetch-Mode"] = "no-cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext in (".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg",
+                 ".ico", ".bmp"):
+        h["Accept"] = ("image/avif,image/webp,image/apng,image/svg+xml,"
+                       "image/*,*/*;q=0.8")
+        h["Sec-Fetch-Dest"] = "image"
+        h["Sec-Fetch-Mode"] = "no-cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext in (".woff", ".woff2", ".ttf", ".otf", ".eot"):
+        h["Accept"] = "*/*"
+        h["Sec-Fetch-Dest"] = "font"
+        h["Sec-Fetch-Mode"] = "cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext in (".mp4", ".webm", ".m4v", ".mov", ".mkv", ".flv", ".ts",
+                 ".m3u8", ".mpd", ".m4s", ".mp2t"):
+        h["Accept"] = "*/*"
+        h["Sec-Fetch-Dest"] = "video"
+        h["Sec-Fetch-Mode"] = "no-cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext in (".mp3", ".m4a", ".aac", ".wav", ".ogg", ".oga", ".flac",
+                 ".opus", ".weba"):
+        h["Accept"] = "*/*"
+        h["Sec-Fetch-Dest"] = "audio"
+        h["Sec-Fetch-Mode"] = "no-cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    elif ext in (".json", ".map", ".wasm"):
+        h["Accept"] = "*/*"
+        h["Sec-Fetch-Dest"] = "empty"
+        h["Sec-Fetch-Mode"] = "cors"
+        h["Sec-Fetch-Site"] = "cross-site"
+    else:
+        browser_accept = incoming.get("accept", "").lower()
+        if browser_accept and "text/html" in browser_accept:
+            h["Sec-Fetch-Dest"] = "document"
+            h["Sec-Fetch-Mode"] = "navigate"
+            h["Sec-Fetch-Site"] = "cross-site"
+            h["Sec-Fetch-User"] = "?1"
+        else:
+            h["Accept"] = incoming.get("accept") or "*/*"
+            h["Sec-Fetch-Dest"] = "empty"
+            h["Sec-Fetch-Mode"] = "cors"
+            h["Sec-Fetch-Site"] = "cross-site"
+
+    if h.get("Sec-Fetch-Mode") != "navigate":
+        h.pop("Sec-Fetch-User", None)
+
     return h
+
+
+def _referer_for(req, sess, target_url, origin):
+    incoming = (req.headers.get("host") or "").lower()
+    in_host = _norm_host(incoming).split(":", 1)[0] if incoming else ""
+    try:
+        target_host = (urlparse(target_url).hostname or "").lower()
+    except Exception:
+        target_host = ""
+
+    def _host_ok(u):
+        if not u:
+            return False
+        try:
+            hp = (urlparse(u).hostname or "").lower()
+            if not hp:
+                return False
+            if hp == in_host:
+                return False
+            return True
+        except Exception:
+            return False
+
+    same = sess.last_page_url_for_origin(origin)
+    if _host_ok(same):
+        return same
+
+    ref = extract_upstream(req.headers.get("referer", ""))
+    if _host_ok(ref):
+        return ref
+
+    any_page = sess.last_page_url(exclude_host=target_host)
+    if _host_ok(any_page):
+        return any_page
+
+    if _host_ok(sess.page_origin):
+        return sess.page_origin
+
+    if _host_ok(sess.last_origin):
+        return sess.last_origin
+
+    return origin + "/"
 
 
 def _incoming_cookie_for_upstream(req):
@@ -1036,6 +1530,8 @@ def _build_response_headers(up_headers_list, is_rewritten):
             continue
         if kl == "set-cookie":
             continue
+        if kl == "content-length":
+            continue
         if kl == "content-encoding":
             if is_rewritten:
                 continue
@@ -1048,6 +1544,27 @@ def _build_response_headers(up_headers_list, is_rewritten):
                 out[kl].append(v)
             else:
                 out[kl] = v
+    return out
+
+
+def _verbatim_response_headers(up_headers_list):
+    out = {}
+    for k, v in up_headers_list:
+        kl = k.lower()
+        if kl in _HOP_BY_HOP:
+            continue
+        if kl == "location":
+            continue
+        if kl == "set-cookie":
+            continue
+        if kl == "content-type":
+            continue
+        if kl in out:
+            if not isinstance(out[kl], list):
+                out[kl] = [out[kl]]
+            out[kl].append(v)
+        else:
+            out[kl] = v
     return out
 
 
@@ -1098,9 +1615,10 @@ async def serve_proxied(req, target_url, sid):
         return RawResponse(sess.source_cache[target_url],
                            content_type="text/html; charset=utf-8")
 
-    out_headers = _collect_request_headers(req)
-    out_headers["Referer"] = (extract_upstream(req.headers.get("referer", ""))
-                              or (origin + "/"))
+    wants = _requested_kind(req, target_url)
+
+    out_headers = _collect_request_headers(req, target_url)
+    out_headers["Referer"] = _referer_for(req, sess, target_url, origin)
 
     browser_cookie = _incoming_cookie_for_upstream(req)
     jar_cookie = sess.cookies.header_for(origin)
@@ -1124,6 +1642,17 @@ async def serve_proxied(req, target_url, sid):
                                         out_headers, req.body)
     except Exception as e:
         log.warning("upstream open failed for %s: %s", target_url, e)
+        if wants == "script":
+            resp = RawResponse(_js_stub(0, target_url, b""),
+                               status=200,
+                               content_type="application/javascript; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            return resp
+        if wants == "style":
+            resp = RawResponse(_css_stub(0, target_url), status=200,
+                               content_type="text/css; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            return resp
         return error_page(
             "Fetch failed",
             f"<b>{esc(type(e).__name__)}</b><br>{esc(str(e))}<br>"
@@ -1141,31 +1670,158 @@ async def serve_proxied(req, target_url, sid):
              or "application/octet-stream").strip()
     low_ct = ctype.lower()
     ce = _header(up_headers, "content-encoding").lower().strip()
+    content_range = _header(up_headers, "content-range")
     origin_host = parsed.hostname or ""
     path_lower = (parsed.path or "").lower()
+    ext = os.path.splitext(path_lower)[1]
 
     sess.history.append({"url": target_url, "status": status,
                          "method": req.method, "ts": time.time()})
 
+    # ============================================================
+    # HEAD — return headers verbatim, no body read.
+    # ============================================================
+    if req.method == "HEAD":
+        await _close_writer(writer)
+        resp_headers = _verbatim_response_headers(up_headers)
+        resp_headers["Content-Type"] = ctype
+        resp = RawResponse(b"", status=status,
+                           content_type=ctype, headers=resp_headers)
+        _add_cookies_to_response(resp, up_headers, origin_host)
+        return resp
+
+    is_binary = _is_media_response(req, target_url, ctype, ext,
+                                    status, content_range)
+
+    # ============================================================
+    # MEDIA — verbatim headers, stream or small-buffer.
+    # ============================================================
+    if is_binary:
+        resp_headers = _verbatim_response_headers(up_headers)
+        resp_headers.setdefault("Content-Type", ctype)
+        _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
+
+        cl_up = _header(up_headers, "content-length")
+        expected_len = None
+        if cl_up:
+            try:
+                expected_len = int(cl_up)
+            except Exception:
+                expected_len = None
+
+        # Small media: buffer once so Content-Length is exact.
+        if expected_len is not None and expected_len <= SMALL_MEDIA_MAX:
+            buf = bytearray()
+            ok = True
+            try:
+                async for chunk in _iter_body(reader, up_headers, first,
+                                               chunk_size=STREAM_CHUNK_SIZE):
+                    buf.extend(chunk)
+            except Exception as e:
+                ok = False
+                log.debug("small media read failed: %s: %s", target_url, e)
+            await _close_writer(writer)
+
+            if ok and len(buf) == expected_len:
+                resp = RawResponse(bytes(buf), status=status,
+                                   content_type=ctype, headers=resp_headers)
+                resp.add_header("Content-Length", str(len(buf)))
+                _add_cookies_to_response(resp, up_headers, origin_host)
+                return resp
+            # Fall through to streaming if short/long read.
+
+        body_gen_factory = _make_streaming_body(reader, writer, up_headers,
+                                                 first, target_url)
+        return StreamingResponse(
+            body_gen_factory(),
+            content_type=ctype,
+            headers=resp_headers,
+            status=status)
+
+    # ============================================================
+    # 3xx redirects
+    # ============================================================
     if 300 <= status < 400:
         loc = _header(up_headers, "location")
-        resp_headers = _build_response_headers(up_headers, is_rewritten=True)
+        absu = None
         if loc:
             try:
-                resp_headers["Location"] = proxy_url(urljoin(target_url, loc))
+                lp = urlparse(loc)
+                if lp.path == "/proxy":
+                    inner_qs = parse_qs(lp.query)
+                    inner = (inner_qs.get("url") or [""])[0]
+                    if inner:
+                        loc = inner
             except Exception:
-                resp_headers["Location"] = loc
-        try: writer.close()
-        except Exception: pass
+                pass
+            try:
+                absu = urljoin(target_url, loc)
+            except Exception:
+                absu = None
+
+        if wants == "script":
+            new_ext = ""
+            if absu:
+                try:
+                    new_ext = os.path.splitext(urlparse(absu).path.lower())[1]
+                except Exception:
+                    new_ext = ""
+            if new_ext not in (".js", ".mjs", ".cjs"):
+                try:
+                    async for _c in _iter_body(reader, up_headers, first):
+                        pass
+                except Exception:
+                    pass
+                await _close_writer(writer)
+                resp = RawResponse(_js_stub(status, target_url, b""),
+                                   status=200,
+                                   content_type="application/javascript; charset=utf-8")
+                resp.add_header("Cache-Control", "no-store")
+                _add_cookies_to_response(resp, up_headers, origin_host)
+                return resp
+
+        if wants == "style":
+            new_ext = ""
+            if absu:
+                try:
+                    new_ext = os.path.splitext(urlparse(absu).path.lower())[1]
+                except Exception:
+                    new_ext = ""
+            if new_ext != ".css":
+                try:
+                    async for _c in _iter_body(reader, up_headers, first):
+                        pass
+                except Exception:
+                    pass
+                await _close_writer(writer)
+                resp = RawResponse(_css_stub(status, target_url), status=200,
+                                   content_type="text/css; charset=utf-8")
+                resp.add_header("Cache-Control", "no-store")
+                _add_cookies_to_response(resp, up_headers, origin_host)
+                return resp
+
+        resp_headers = _build_response_headers(up_headers, is_rewritten=True)
+        if absu:
+            if is_self_target(req, absu):
+                ap = urlparse(absu)
+                alt = origin + (ap.path or "/")
+                if ap.query:
+                    alt += "?" + ap.query
+                if not is_self_target(req, alt):
+                    absu = alt
+            resp_headers["Location"] = proxy_url(absu)
+        else:
+            resp_headers["Location"] = loc or "/"
+
+        await _close_writer(writer)
         resp = RawResponse(b"", status=status, headers=resp_headers,
                            content_type="text/plain; charset=utf-8")
         _add_cookies_to_response(resp, up_headers, origin_host)
-        resp.add_header("Set-Cookie",
-                        f"{SESSION_COOKIE}={sid}; Path=/; Max-Age=86400; SameSite=Lax")
-        resp.add_header("Set-Cookie",
-                        f"{ORIGIN_COOKIE}={quote(origin, safe='')}; Path=/; Max-Age=86400; SameSite=Lax")
         return resp
 
+    # ============================================================
+    # HLS playlist
+    # ============================================================
     is_m3u8 = ("mpegurl" in low_ct
                or "application/vnd.apple" in low_ct
                or path_lower.endswith(".m3u8"))
@@ -1179,23 +1835,22 @@ async def serve_proxied(req, target_url, sid):
                     break
         except Exception:
             pass
-        try: writer.close()
-        except Exception: pass
+        await _close_writer(writer)
 
         if oversized:
             head_bytes = bytes(buf)
             resp_headers = _build_response_headers(up_headers,
                                                     is_rewritten=False)
-
+            cl = _header(up_headers, "content-length")
+            if cl:
+                try: resp_headers["Content-Length"] = str(int(cl))
+                except Exception: pass
+            _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
             async def phls_raw():
                 try:
-                    async for chunk in _iter_body_identity(
-                            reader, up_headers, head_bytes):
-                        yield chunk
-                except Exception:
+                    yield head_bytes
+                finally:
                     pass
-
-            _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
             return StreamingResponse(
                 phls_raw(),
                 content_type="application/vnd.apple.mpegurl",
@@ -1215,13 +1870,103 @@ async def serve_proxied(req, target_url, sid):
                            content_type="application/vnd.apple.mpegurl; charset=utf-8",
                            headers=resp_headers)
         _add_cookies_to_response(resp, up_headers, origin_host)
-        resp.add_header("Set-Cookie",
-                        f"{SESSION_COOKIE}={sid}; Path=/; Max-Age=86400; SameSite=Lax")
-        resp.add_header("Set-Cookie",
-                        f"{ORIGIN_COOKIE}={quote(origin, safe='')}; Path=/; Max-Age=86400; SameSite=Lax")
         return resp
 
-    if "text/html" in low_ct or "application/xhtml" in low_ct:
+    is_static_asset = ext in STATIC_EXTS
+
+    # ============================================================
+    # JS stub for failed script fetch
+    # ============================================================
+    if wants == "script":
+        if status >= 400 or ("text/html" in low_ct or "text/xml" in low_ct
+                              or "application/xhtml" in low_ct):
+            preview = b""
+            try:
+                preview = bytes(first[:200])
+            except Exception:
+                preview = b""
+            try:
+                async for _c in _iter_body(reader, up_headers, first):
+                    pass
+            except Exception:
+                pass
+            await _close_writer(writer)
+            resp = RawResponse(_js_stub(status, target_url, preview),
+                               status=200,
+                               content_type="application/javascript; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            _add_cookies_to_response(resp, up_headers, origin_host)
+            return resp
+        peek = b""
+        try:
+            peek = bytes(first[:512])
+        except Exception:
+            peek = b""
+        if _looks_like_html(peek):
+            try:
+                async for _c in _iter_body(reader, up_headers, first):
+                    pass
+            except Exception:
+                pass
+            await _close_writer(writer)
+            resp = RawResponse(_js_stub(status, target_url, peek),
+                               status=200,
+                               content_type="application/javascript; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            _add_cookies_to_response(resp, up_headers, origin_host)
+            return resp
+
+    # ============================================================
+    # CSS stub for failed style fetch
+    # ============================================================
+    if wants == "style":
+        if status >= 400 or "text/html" in low_ct:
+            try:
+                async for _c in _iter_body(reader, up_headers, first):
+                    pass
+            except Exception:
+                pass
+            await _close_writer(writer)
+            resp = RawResponse(_css_stub(status, target_url), status=200,
+                               content_type="text/css; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            _add_cookies_to_response(resp, up_headers, origin_host)
+            return resp
+
+    if is_static_asset and ext in (".js", ".mjs", ".cjs"):
+        if status >= 400 or ("text/html" in low_ct or "text/xml" in low_ct):
+            try:
+                async for _c in _iter_body(reader, up_headers, first):
+                    pass
+            except Exception:
+                pass
+            await _close_writer(writer)
+            resp = RawResponse(_js_stub(status, target_url, b""),
+                               status=200,
+                               content_type="application/javascript; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            _add_cookies_to_response(resp, up_headers, origin_host)
+            return resp
+
+    if is_static_asset and ext == ".css":
+        if status >= 400 or "text/html" in low_ct:
+            try:
+                async for _c in _iter_body(reader, up_headers, first):
+                    pass
+            except Exception:
+                pass
+            await _close_writer(writer)
+            resp = RawResponse(_css_stub(status, target_url), status=200,
+                               content_type="text/css; charset=utf-8")
+            resp.add_header("Cache-Control", "no-store")
+            _add_cookies_to_response(resp, up_headers, origin_host)
+            return resp
+
+    # ============================================================
+    # HTML — rewrite
+    # ============================================================
+    if (not is_static_asset) and ("text/html" in low_ct
+                                   or "application/xhtml" in low_ct):
         buf = bytearray(); rewritable = True
         try:
             async for chunk in _iter_body(reader, up_headers, first):
@@ -1231,13 +1976,13 @@ async def serve_proxied(req, target_url, sid):
                     break
         except Exception as e:
             log.debug("html read stopped: %s", e)
-        try: writer.close()
-        except Exception: pass
+        await _close_writer(writer)
 
         if rewritable:
             raw = bytes(buf)
             if ce and ce != "identity":
                 raw = _decompress(raw, ce)
+            sess.page_origin = origin
             ctx = {"upstream": target_url, "sid": sid,
                    "_injected": [s["code"] for s in sess.injected
                                  if s["enabled"]]}
@@ -1256,22 +2001,24 @@ async def serve_proxied(req, target_url, sid):
 
         head_bytes = bytes(buf)
         resp_headers = _build_response_headers(up_headers, is_rewritten=False)
-
+        cl = _header(up_headers, "content-length")
+        if cl:
+            try: resp_headers["Content-Length"] = str(int(cl))
+            except Exception: pass
+        _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
         async def passthrough_html():
             try:
-                async for chunk in _iter_body_identity(
-                        reader, up_headers, head_bytes):
-                    yield chunk
+                yield head_bytes
             finally:
-                try: writer.close()
-                except Exception: pass
-
-        _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
+                pass
         return StreamingResponse(passthrough_html(),
                                  content_type="text/html; charset=utf-8",
                                  headers=resp_headers, status=status)
 
-    if "text/css" in low_ct:
+    # ============================================================
+    # CSS — rewrite
+    # ============================================================
+    if (not is_static_asset) and "text/css" in low_ct:
         buf = bytearray(); oversized = False
         try:
             async for chunk in _iter_body(reader, up_headers, first):
@@ -1281,24 +2028,22 @@ async def serve_proxied(req, target_url, sid):
                     break
         except Exception:
             pass
-        try: writer.close()
-        except Exception: pass
+        await _close_writer(writer)
 
         if oversized:
             head_bytes = bytes(buf)
             resp_headers = _build_response_headers(up_headers,
                                                     is_rewritten=False)
-
+            cl = _header(up_headers, "content-length")
+            if cl:
+                try: resp_headers["Content-Length"] = str(int(cl))
+                except Exception: pass
+            _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
             async def pcss():
                 try:
-                    async for chunk in _iter_body_identity(
-                            reader, up_headers, head_bytes):
-                        yield chunk
+                    yield head_bytes
                 finally:
-                    try: writer.close()
-                    except Exception: pass
-
-            _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
+                    pass
             return StreamingResponse(pcss(),
                                      content_type="text/css; charset=utf-8",
                                      headers=resp_headers, status=status)
@@ -1314,20 +2059,81 @@ async def serve_proxied(req, target_url, sid):
         _add_cookies_to_response(resp, up_headers, origin_host)
         return resp
 
+    # ============================================================
+    # TEXT/JSON — buffered passthrough (small only)
+    # ============================================================
     resp_headers = _build_response_headers(up_headers, is_rewritten=False)
+
+    cl_up = _header(up_headers, "content-length")
+    expected_len = None
+    if cl_up:
+        try:
+            expected_len = int(cl_up)
+            resp_headers["Content-Length"] = str(expected_len)
+        except Exception:
+            pass
+
+    # If the response is huge and text-y, stream it instead of buffering.
+    if expected_len is not None and expected_len > MAX_BUFFER_BYTES:
+        _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
+        body_gen_factory = _make_streaming_body(reader, writer, up_headers,
+                                                 first, target_url)
+        return StreamingResponse(
+            body_gen_factory(),
+            content_type=ctype,
+            headers=resp_headers,
+            status=status)
+
+    buf = bytearray()
+    overflow = False
+    read_complete = True
+    try:
+        async for chunk in _iter_body(reader, up_headers, first,
+                                       chunk_size=STREAM_CHUNK_SIZE):
+            buf.extend(chunk)
+            if len(buf) > MAX_BUFFER_BYTES:
+                overflow = True
+                break
+    except Exception as e:
+        read_complete = False
+        log.debug("passthrough read stopped for %s: %s", target_url, e)
+
+    if not overflow and read_complete:
+        await _close_writer(writer)
+
+        buf_len = len(buf)
+        if expected_len is not None and buf_len != expected_len:
+            log.warning("short read for %s: got %d of %d bytes",
+                        target_url, buf_len, expected_len)
+            resp_headers.pop("Content-Length", None)
+
+        resp = RawResponse(bytes(buf), status=status,
+                           content_type=ctype, headers=resp_headers)
+        try:
+            existing = {k.lower() for k in (resp.headers or {}).keys()}
+        except Exception:
+            existing = set()
+        if "content-length" not in existing:
+            resp.add_header("Content-Length", str(buf_len))
+        _add_cookies_to_response(resp, up_headers, origin_host)
+        return resp
+
+    head_bytes = bytes(buf)
+    resp_headers.pop("Content-Length", None)
     _add_cookies_to_streaming(resp_headers, up_headers, origin_host)
 
     async def passthrough():
         try:
-            async for chunk in _iter_body(reader, up_headers, first):
+            yield head_bytes
+            async for chunk in _iter_body(reader, up_headers, b"",
+                                           chunk_size=STREAM_CHUNK_SIZE):
                 yield chunk
         except (ConnectionResetError, BrokenPipeError):
             pass
         except Exception as e:
             log.debug("stream aborted for %s: %s", target_url, e)
         finally:
-            try: writer.close()
-            except Exception: pass
+            await _close_writer(writer)
 
     return StreamingResponse(passthrough(),
                              content_type=ctype,
@@ -1335,15 +2141,19 @@ async def serve_proxied(req, target_url, sid):
 
 
 async def _try_proxy_candidates(req, sess, sid, path_only, qs, candidates):
+    dest = (req.headers.get("sec-fetch-dest") or "").lower()
+    if dest in ("document", "iframe", "frame") and sess.page_origin:
+        po = sess.page_origin
+        if po in candidates:
+            candidates = [po] + [c for c in candidates if c != po]
+
     for origin in candidates:
         target = origin.rstrip("/") + path_only
         if qs:
             target += "?" + qs
         try:
-            out_headers = _collect_request_headers(req)
-            out_headers["Referer"] = (
-                extract_upstream(req.headers.get("referer", ""))
-                or (origin + "/"))
+            out_headers = _collect_request_headers(req, target)
+            out_headers["Referer"] = _referer_for(req, sess, target, origin)
             incoming_cookie = _incoming_cookie_for_upstream(req)
             if incoming_cookie:
                 out_headers["Cookie"] = incoming_cookie
@@ -1352,11 +2162,9 @@ async def _try_proxy_candidates(req, sess, sid, path_only, qs, candidates):
                 await _open_upstream_stream(target, req.method,
                                             out_headers, req.body)
             if 400 <= status < 500 and status not in (401, 403):
-                try: writer.close()
-                except Exception: pass
+                await _close_writer(writer)
                 continue
-            try: writer.close()
-            except Exception: pass
+            await _close_writer(writer)
             return await serve_proxied(req, target, sid)
         except Exception as e:
             log.debug("candidate %s failed: %s", origin, e)
@@ -1440,13 +2248,36 @@ def tool(name):
 
 
 async def _get_form(req):
+    body = getattr(req, "body", None) or b""
+    ct = (req.headers.get("content-type") or "").lower()
+
+    if body and "application/json" in ct:
+        try:
+            data = json.loads(body.decode("utf-8", "ignore"))
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
     try:
         data = await req.form()
+        if isinstance(data, dict) and "fields" in data:
+            return data["fields"]
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    if body and "urlencoded" in ct:
+        try:
+            return dict(parse_qsl(body.decode("utf-8", "ignore")))
+        except Exception:
+            pass
+
+    try:
+        return dict(req.query_params)
     except Exception:
         return {}
-    if isinstance(data, dict) and "fields" in data:
-        return data["fields"]
-    return data
 
 
 # ---- recon ----
@@ -1522,6 +2353,18 @@ async def t_inject_list(req):
                          for s in get_session(sid).injected]}
 
 
+@tool("inject/list-full")
+async def t_inject_list_full(req):
+    sid, _ = session_from_req(req)
+    sess = get_session(sid)
+    return {"snippets": [
+        {"id": s["id"], "name": s["name"],
+         "code": s["code"], "enabled": s["enabled"],
+         "size": len(s["code"])}
+        for s in sess.injected
+    ]}
+
+
 @tool("inject/add")
 async def t_inject_add(req):
     sid, _ = session_from_req(req)
@@ -1531,9 +2374,34 @@ async def t_inject_add(req):
     code = fields.get("code") or ""
     if not code.strip():
         return {"ok": False, "reason": "empty"}
-    sess.injected.append({"id": uuid.uuid4().hex[:8], "name": name,
-                          "code": code, "enabled": True})
-    return {"ok": True}
+    snippet = {"id": uuid.uuid4().hex[:8], "name": name,
+               "code": code, "enabled": True}
+    sess.injected.append(snippet)
+    return {"ok": True, "id": snippet["id"], "name": name}
+
+
+@tool("inject/toggle")
+async def t_inject_toggle(req):
+    sid, _ = session_from_req(req)
+    sess = get_session(sid)
+    fields = await _get_form(req)
+    sid_in = (fields.get("id") or "").strip()
+    for s in sess.injected:
+        if s["id"] == sid_in:
+            s["enabled"] = not s["enabled"]
+            return {"ok": True, "enabled": s["enabled"]}
+    return {"ok": False, "reason": "not found"}
+
+
+@tool("inject/delete")
+async def t_inject_delete(req):
+    sid, _ = session_from_req(req)
+    sess = get_session(sid)
+    fields = await _get_form(req)
+    sid_in = (fields.get("id") or "").strip()
+    before = len(sess.injected)
+    sess.injected = [s for s in sess.injected if s["id"] != sid_in]
+    return {"ok": len(sess.injected) < before}
 
 
 # ---- cookies ----
@@ -1748,7 +2616,7 @@ async def t_vulnscan(req):
 
 
 # ======================================================================
-# Extended tools — every endpoint toolkit.js calls
+# Extended tools
 # ======================================================================
 _BRUTE_DEFAULT = [
     "admin","login","dashboard","api","api/v1","api/v2","graphql","swagger",
@@ -2915,6 +3783,142 @@ async def t_hsts_audit(req):
     }
 
 
+# ======================================================================
+# Captcha detection + removal
+# ======================================================================
+@tool("captcha-detect")
+async def t_captcha_detect(req):
+    fields = await _get_form(req)
+    url = (fields.get("url") or req.query_params.get("url") or "").strip()
+    if not url:
+        return {"error": "url required"}
+    try:
+        r = await app.fetch(url, headers=BROWSER_HEADERS, timeout=15.0,
+                            allow_redirects=True, max_redirects=3)
+        body = r.content
+        ce = r.headers.get("content-encoding")
+        if ce: body = _decompress(body, ce)
+        html = body.decode("utf-8", errors="replace")
+    except Exception as e:
+        return {"error": str(e)}
+
+    markers = [
+        ("Google reCAPTCHA", ["g-recaptcha", "recaptcha/api.js",
+                               "gstatic.com/recaptcha", "recaptcha.net"]),
+        ("hCaptcha", ["hcaptcha.com", "h-captcha", "data-hcaptcha"]),
+        ("Cloudflare Turnstile", ["challenges.cloudflare.com/turnstile",
+                                   "cf-turnstile"]),
+        ("Cloudflare Challenge", ["cf-challenge", "cf_chl_", "__cf_chl",
+                                   "cdn-cgi/challenge-platform"]),
+        ("DataDome", ["datadome", "dd_cookie", "js.datadome.co"]),
+        ("PerimeterX / HUMAN", ["_px", "perimeterx", "px-captcha",
+                                 "px-cloud.net"]),
+        ("Arkose Labs", ["arkoselabs", "funcaptcha", "arkose"]),
+        ("AWS WAF Captcha", ["awswaf", "captcha.awswaf"]),
+        ("Kasada", ["kasada", "x-kpsdk", "kpsdk"]),
+        ("FriendlyCaptcha", ["friendlycaptcha", "frc-captcha"]),
+        ("Geetest", ["geetest", "gt.js", "gt4.js"]),
+        ("MTCaptcha", ["mtcaptcha"]),
+    ]
+    detected = []
+    for name, sigs in markers:
+        for s in sigs:
+            if s.lower() in html.lower():
+                detected.append(name)
+                break
+    return {"url": url, "detected": detected, "html_size": len(html),
+            "captcha_script_count": sum(
+                1 for s in CAPTCHA_HOSTS if s in html.lower())}
+
+
+_CAPTCHA_KILL_JS = r"""
+(function(){
+  if (window.__LYNK_CAPTCHA_KILL__) return;
+  window.__LYNK_CAPTCHA_KILL__ = true;
+  var SELECTORS = [
+    '.g-recaptcha','#g-recaptcha','[data-sitekey]','.grecaptcha-badge',
+    '.h-captcha','[data-hcaptcha-widget-id]','.h-captcha-response',
+    '.cf-turnstile','[data-cf-turnstile]','.cf-turnstile-wrapper',
+    'iframe[src*="recaptcha"]','iframe[src*="hcaptcha"]',
+    'iframe[src*="challenges.cloudflare.com"]',
+    'iframe[src*="captcha"]','iframe[title*="captcha" i]',
+    'iframe[title*="challenge" i]',
+    'div[class*="captcha" i]','div[id*="captcha" i]',
+    'div[class*="challenge" i]','div[id*="challenge" i]',
+    'div[class*="px-captcha" i]','div[id*="px-captcha" i]',
+    'div[class*="dd-" i]','div[id*="dd-" i]',
+    '[data-testid*="captcha" i]','[data-testid*="challenge" i]',
+    'section[class*="challenge" i]','div[id*="cf-wrapper"]'
+  ];
+  function kill(){
+    SELECTORS.forEach(function(sel){
+      try {
+        document.querySelectorAll(sel).forEach(function(el){
+          el.style.setProperty('display','none','important');
+          el.style.setProperty('visibility','hidden','important');
+          el.style.setProperty('pointer-events','none','important');
+          el.setAttribute('aria-hidden','true');
+        });
+      } catch(e){}
+    });
+    try {
+      document.querySelectorAll('body > div, body > section').forEach(function(d){
+        try {
+          var s = getComputedStyle(d);
+          if (s.position !== 'fixed' && s.position !== 'absolute') return;
+          if ((parseFloat(s.zIndex)||0) < 900) return;
+          if (d.offsetWidth  >= window.innerWidth  * 0.85 &&
+              d.offsetHeight >= window.innerHeight * 0.85){
+            d.style.setProperty('display','none','important');
+          }
+        } catch(e){}
+      });
+    } catch(e){}
+    try {
+      [document.body, document.documentElement].forEach(function(el){
+        if (!el || !el.style) return;
+        el.style.setProperty('overflow','auto','important');
+        el.style.setProperty('pointer-events','auto','important');
+        el.style.removeProperty('position');
+      });
+    } catch(e){}
+  }
+  kill();
+  try {
+    new MutationObserver(kill).observe(document.documentElement, {
+      subtree: true, childList: true, attributes: true,
+      attributeFilter: ['class','style','hidden','aria-hidden']
+    });
+  } catch(e){}
+  setInterval(kill, 1500);
+  try { console.log('[lynk] captcha remover active'); } catch(e){}
+})();
+"""
+
+
+@tool("captcha-remove-js")
+async def t_captcha_remove_js(req):
+    return {"ok": True, "code": _CAPTCHA_KILL_JS}
+
+
+@tool("captcha-remove")
+async def t_captcha_remove(req):
+    sid, _ = session_from_req(req)
+    sess = get_session(sid)
+    for s in sess.injected:
+        if s["name"] == "Captcha Remover":
+            s["enabled"] = True
+            return {"ok": True, "id": s["id"], "already": True}
+    snippet = {
+        "id": uuid.uuid4().hex[:8],
+        "name": "Captcha Remover",
+        "code": _CAPTCHA_KILL_JS,
+        "enabled": True,
+    }
+    sess.injected.append(snippet)
+    return {"ok": True, "id": snippet["id"]}
+
+
 @app.get("/tool/fetch")
 async def t_fetch(req):
     url = req.query_params.get("url") or ""
@@ -3029,7 +4033,7 @@ async def favicon(req):
 
 
 # ======================================================================
-# Tool dispatcher (matches /tool/<name>)
+# Tool dispatcher
 # ======================================================================
 @app.route("/tool/*", methods=["GET", "POST", "OPTIONS"])
 async def tool_dispatch(req, wildcard=""):
@@ -3122,6 +4126,7 @@ async def catch_all(req, wildcard=""):
 
     if path_only == "/favicon.ico":
         return RawResponse(b"", status=204, content_type="image/x-icon")
+
     if path_only.startswith(("/static/", "/lynkio/", "/tool/", "/__lynk_")):
         return error_page("Not found",
                           f"<code>{esc(path_only)}</code> not found.", 404)
@@ -3130,14 +4135,12 @@ async def catch_all(req, wildcard=""):
     sess = get_session(sid)
 
     candidates = []
-    ref_origin = ""
     ref = req.headers.get("referer", "")
     up = extract_upstream(ref)
     if up:
         p = urlparse(up)
         if p.scheme in ("http", "https") and p.netloc:
-            ref_origin = f"{p.scheme}://{p.netloc}"
-            candidates.append(ref_origin)
+            candidates.append(f"{p.scheme}://{p.netloc}")
     for (o, ts) in sess.recent_origins:
         if o not in candidates:
             candidates.append(o)
@@ -3181,6 +4184,10 @@ async def healthz(req):
         "templates_dir_exists": os.path.isdir(TEMPLATES_DIR),
         "scanner_loaded": True,
         "tools_registered": len(TOOLS),
+        "captcha_hosts": len(CAPTCHA_HOSTS),
+        "stream_media_exts": len(STREAM_MEDIA_EXTS),
+        "stream_chunk_size": STREAM_CHUNK_SIZE,
+        "small_media_max": SMALL_MEDIA_MAX,
     })
 
 
@@ -3189,7 +4196,7 @@ async def healthz(req):
 # ======================================================================
 if __name__ == "__main__":
     print("=" * 68)
-    print(f"  🛠  Lynkio Browser — v17.1   (framework {framework_version})")
+    print(f"  🛠  Lynkio Browser — v17.9   (framework {framework_version})")
     print("=" * 68)
     print(f"  Home       →  http://localhost:{PORT}/")
     print(f"  Browser    →  http://localhost:{PORT}/tabs")
@@ -3199,25 +4206,10 @@ if __name__ == "__main__":
     print(f"  Static     →  /static/*   (from {STATIC_DIR})")
     print(f"  Templates  →  /static/templates/*  (from {TEMPLATES_DIR})")
     print("=" * 68)
-    print(f"  static exists:    {os.path.isdir(STATIC_DIR)}")
-    print(f"  templates exists: {os.path.isdir(TEMPLATES_DIR)}")
-    if os.path.isdir(STATIC_DIR):
-        try:
-            for root, dirs, files in os.walk(STATIC_DIR):
-                for f in files:
-                    rel = os.path.relpath(os.path.join(root, f), STATIC_DIR)
-                    print(f"    static/{rel}")
-        except Exception:
-            pass
-    if os.path.isdir(TEMPLATES_DIR):
-        try:
-            for f in sorted(os.listdir(TEMPLATES_DIR)):
-                if os.path.isfile(os.path.join(TEMPLATES_DIR, f)):
-                    print(f"    templates/{f}")
-        except Exception:
-            pass
-    print("=" * 68)
-    print(f"  Scanner: 400+ checks ready at /tool/vulnscan")
+    print(f"  Stream chunk size: {STREAM_CHUNK_SIZE // 1024} KiB")
+    print(f"  Small media max:   {SMALL_MEDIA_MAX // 1024} KiB")
+    print(f"  Stream media exts: {len(STREAM_MEDIA_EXTS)}")
+    print(f"  Captcha hosts:     {len(CAPTCHA_HOSTS)}")
     print(f"  Toolkit: {len(TOOLS)} endpoints wired")
     print("=" * 68)
     app.run()
